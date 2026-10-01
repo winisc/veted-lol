@@ -1,0 +1,51 @@
+import { matchRepository } from '../matches/match.repository'
+import { computePoints, scoring, winRate } from '../matches/match.scoring'
+import { resolveIconId } from '../../shared/utils/icons'
+import { formatRiotId } from '../../shared/utils/riotId'
+import { zoneFor, type Zone } from './ranking.zones'
+
+export interface RankingEntry {
+  position: number
+  zone: Zone
+  userId: number
+  riotId: string
+  iconId: number
+  points: number
+  games: number
+  wins: number
+  losses: number
+  winRate: number | null
+  mvps: number
+}
+
+// Ordem: mais pontos, depois melhor win rate, mais vitórias, mais MVPs e, por fim, nome.
+export function getRanking(): RankingEntry[] {
+  return matchRepository
+    .rankingRows()
+    .map((row) => ({
+      userId: row.userId,
+      riotId: formatRiotId(row.gameName, row.tagLine),
+      iconId: resolveIconId(row.userId, row.profileIconId),
+      points: computePoints(row),
+      games: row.games,
+      wins: row.wins,
+      losses: row.losses,
+      winRate: winRate(row.wins, row.losses),
+      mvps: row.mvps,
+    }))
+    .sort(
+      (a, b) =>
+        b.points - a.points ||
+        (b.winRate ?? -1) - (a.winRate ?? -1) ||
+        b.wins - a.wins ||
+        b.mvps - a.mvps ||
+        a.riotId.localeCompare(b.riotId),
+    )
+    .map((entry, i, all) => ({ position: i + 1, zone: zoneFor(i + 1, all.length), ...entry }))
+}
+
+export const rankingService = {
+  get() {
+    return { scoring, ranking: getRanking() }
+  },
+}

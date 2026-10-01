@@ -1,0 +1,63 @@
+import type { ReactNode } from 'react'
+import { splitRiotId } from '../../lib/teams'
+import SummonerIcon, { type IconRing, type IconSize } from './SummonerIcon'
+
+interface Props {
+  riotId: string
+  iconId: number
+  ring?: IconRing
+  size?: IconSize
+  highlight?: boolean
+  leading?: ReactNode // antes do ícone (ex.: posição na tabela)
+  badges?: ReactNode // na mesma linha do nome
+  right?: ReactNode // canto direito
+  onClick?: () => void // vira botão (ex.: pick no draft)
+  disabled?: boolean
+  className?: string
+}
+
+// Linha horizontal e compacta de jogador (times, listas, picks).
+export default function PlayerRow({
+  riotId,
+  iconId,
+  ring = 'dim',
+  size = 'sm',
+  highlight,
+  leading,
+  badges,
+  right,
+  onClick,
+  disabled,
+  className = '',
+}: Props) {
+  const [name, tag] = splitRiotId(riotId)
+  const classes = `flex w-full items-center gap-2.5 rounded-md border px-2.5 py-1.5 text-left ${
+    highlight ? 'border-gold-200/40 bg-gold-200/[0.06]' : 'border-transparent bg-panel'
+  } ${className}`
+
+  const body = (
+    <>
+      {leading && <div className="shrink-0">{leading}</div>}
+      <SummonerIcon iconId={iconId} size={size} ring={ring} />
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
+        <span className="truncate font-semibold text-gold-50">{name}</span>
+        <span className="hidden text-xs text-ash xl:inline">#{tag}</span>
+        {badges}
+      </div>
+      {right && <div className="shrink-0">{right}</div>}
+    </>
+  )
+
+  if (!onClick) return <div className={classes}>{body}</div>
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`${classes} transition-colors hover:border-gold-200/60 hover:bg-rim disabled:opacity-60`}
+    >
+      {body}
+    </button>
+  )
+}

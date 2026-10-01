@@ -1,0 +1,13 @@
+services:
+  backend:
+    build: .
+    container_name: tabela-veted-backend
+    env_file: .env
+    ports:
+      - "127.0.0.1:3333:3333"
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+volumes:
+  data:

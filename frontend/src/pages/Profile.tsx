@@ -1,0 +1,182 @@
+import Notice from '../components/ui/Notice'
+import Panel from '../components/ui/Panel'
+import ScoringRules from '../components/ui/ScoringRules'
+import SummonerIcon from '../components/ui/SummonerIcon'
+import { CrownIcon, StarIcon } from '../components/ui/icons'
+import { useApi } from '../hooks/useApi'
+import { profileSplash } from '../lib/ddragon'
+import { formatDate, formatDateTime, formatPercent, signed } from '../lib/format'
+import { formatDuration, splitRiotId } from '../lib/teams'
+import { zones, type Zone } from '../lib/zones'
+
+type Result = 'win' | 'loss' | 'remake'
+
+interface ProfileResponse {
+  user: { id: number; riotId: string; iconId: number; createdAt: string }
+  stats: {
+    points: number
+    games: number
+    wins: number
+    losses: number
+    winRate: number | null
+    mvps: number
+    rank: number | null
+    zone: Zone | null
+    rankedPlayers: number
+  }
+  history: {
+    matchId: string
+    endedAt: string
+    durationSeconds: number
+    side: 'blue' | 'red'
+    result: Result
+    isCaptain: boolean
+    isMvp: boolean
+    points: number
+  }[]
+  scoring: { win: number; loss: number; mvp: number }
+}
+
+// Cores do histórico como no LoL: vitória em ciano, derrota em vermelho.
+const resultStyle: Record<Result, { label: string; bar: string; text: string }> = {
+  win: { label: 'Vitória', bar: 'bg-hex-300', text: 'text-hex-300' },
+  loss: { label: 'Derrota', bar: 'bg-team-red', text: 'text-team-red' },
+  remake: { label: 'Remake', bar: 'bg-ash-dim', text: 'text-ash' },
+}
+
+// Anel de win rate (vitórias em ciano sobre o total).
+function WinRateRing({ value }: { value: number | null }) {
+  const r = 52
+  const c = 2 * Math.PI * r
+  const pct = value ?? 0
+  return (
+    <div className="relative grid h-36 w-36 place-items-center">
+      <svg viewBox="0 0 120 120" className="absolute inset-0 -rotate-90" aria-hidden="true">
+        <circle cx="60" cy="60" r={r} fill="none" stroke="#E84057" strokeOpacity={value === null ? 0 : 0.55} strokeWidth="8" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="#1E2D3D" strokeOpacity={value === null ? 1 : 0} strokeWidth="8" />
+        <circle
+          cx="60"
+          cy="60"
+          r={r}
+          fill="none"
+          stroke="#0AC8B9"
+          strokeWidth="8"
+          strokeDasharray={`${(pct / 100) * c} ${c}`}
+        />
+      </svg>
+      <div className="text-center">
+        <p className="font-cond text-3xl font-bold leading-none tabular-nums text-gold-50">{formatPercent(value)}</p>
+        <p className="mt-1 text-xs text-ash">win rate</p>
+      </div>
+    </div>
+  )
+}
+
+function Stat({ label, value, tone = 'text-gold-50' }: { label: string; value: string | number; tone?: string }) {
+  return (
+    <div className="border-l border-rim pl-4">
+      <p className="text-sm text-ash">{label}</p>
+      <p className={`font-cond text-4xl font-bold leading-tight tabular-nums ${tone}`}>{value}</p>
+    </div>
+  )
+}
+
+export default function Profile() {
+  const { data, error, loading } = useApi<ProfileResponse>('/profile')
+
+  if (loading) return <p className="text-ash">Carregando perfil...</p>
+  if (error || !data) return <Notice>{error || 'Não foi possível carregar o perfil.'}</Notice>
+
+  const { user, stats, history, scoring } = data
+  const [name, tag] = splitRiotId(user.riotId)
+  const zone = stats.zone ? zones[stats.zone] : null
+  const pointsTone = stats.points < 0 ? 'text-team-red' : 'text-gold-200'
+
+  return (
+    <div className="space-y-6">
+      {/* Banner com splash art e o ícone de invocador em destaque */}
+      <section className="relative isolate overflow-hidden rounded-xl border border-rim bg-abyss">
+        <img src={profileSplash(user.id)} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover object-[center_20%] opacity-60" />
+        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-linear-to-t from-void via-void/70 to-void/10" />
+        <div className="flex flex-col items-center gap-5 px-6 pb-8 pt-20 text-center sm:flex-row sm:items-end sm:pt-28 sm:text-left">
+          <SummonerIcon iconId={user.iconId} size="2xl" ring={zone?.ring === 'red' ? 'red' : 'gold'} glow />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-display text-4xl text-gold-50 sm:text-5xl">{name}</h1>
+            <p className="text-lg text-ash">#{tag}</p>
+            <p className="mt-1 text-sm text-ash">Jogando desde {formatDate(user.createdAt)}</p>
+          </div>
+          <div className="flex flex-col items-center gap-2 sm:items-end">
+            {stats.rank && zone ? (
+              <>
+                <p className={`font-cond text-5xl font-bold leading-none ${zone.text}`}>#{stats.rank}</p>
+                <p className="text-sm text-ash">de {stats.rankedPlayers} na tabela</p>
+                <span className={`bevel-sm px-3 py-1 text-sm font-bold ${zone.badge}`}>
+                  {zone.symbol} {zone.label}
+                </span>
+              </>
+            ) : (
+              <p className="max-w-48 text-sm text-ash">Sem posição na tabela ainda. Jogue uma partida.</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <Panel title="Estatísticas">
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+          <WinRateRing value={stats.winRate} />
+          <div className="grid w-full flex-1 grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-5">
+            <Stat label="Pontos" value={stats.points} tone={pointsTone} />
+            <Stat label="Partidas" value={stats.games} />
+            <Stat label="Vitórias" value={stats.wins} tone="text-hex-300" />
+            <Stat label="Derrotas" value={stats.losses} tone="text-team-red" />
+            <Stat label="MVPs" value={stats.mvps} tone="text-gold-200" />
+          </div>
+        </div>
+        <ScoringRules scoring={scoring} className="mt-5 border-t border-rim pt-4" />
+      </Panel>
+
+      <Panel title="Histórico de partidas" bodyClassName="p-3">
+        {history.length === 0 ? (
+          <p className="p-4 text-center text-ash">Nenhuma partida ainda. Entre na fila pela aba Jogar.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {history.map((match) => {
+              const style = resultStyle[match.result]
+              return (
+                <li key={match.matchId} className="flex items-stretch overflow-hidden rounded-md bg-panel">
+                  <span className={`w-1 shrink-0 ${style.bar}`} aria-hidden="true" />
+                  <div className="flex flex-1 flex-wrap items-center gap-x-5 gap-y-1 px-4 py-3">
+                    <div className="w-24">
+                      <p className={`font-display text-lg ${style.text}`}>{style.label}</p>
+                      <p className="font-cond text-sm tabular-nums text-ash">{formatDuration(match.durationSeconds)}</p>
+                    </div>
+                    <div className="min-w-0 flex-1 text-sm">
+                      <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="flex items-center gap-1.5 text-gold-50">
+                          <span className={`h-2 w-2 rounded-full ${match.side === 'blue' ? 'bg-team-blue' : 'bg-team-red'}`} />
+                          {match.side === 'blue' ? 'Lado azul' : 'Lado vermelho'}
+                        </span>
+                        {match.isCaptain && (
+                          <span className="flex items-center gap-1 text-gold-200">
+                            <CrownIcon className="h-3.5 w-3.5" /> Capitão
+                          </span>
+                        )}
+                        {match.isMvp && (
+                          <span className="flex items-center gap-1 font-semibold text-gold-200">
+                            <StarIcon className="h-3.5 w-3.5" /> MVP
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-ash">{formatDateTime(match.endedAt)}</p>
+                    </div>
+                    <span className={`font-cond text-2xl font-bold tabular-nums ${style.text}`}>{signed(match.points)}</span>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Panel>
+    </div>
+  )
+}

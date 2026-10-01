@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+/*
+  Tokens. Base neutra grafite (sem tom dourado) e UM acento: o ouro do LoL, usado só onde importa
+  (ação principal, você, 1º lugar). Ciano/azul/vermelho só com significado (vitória, derrota, lados).
+  Os nomes "gold-*" foram mantidos para não renomear o projeto inteiro:
+    gold-50  = texto forte (quase branco)       gold-200 = acento (ouro)
+    gold-500 = acento apagado                   gold-700 = linha/tinta neutra
+*/
+@theme {
+  --font-display: "Barlow Semi Condensed", "Barlow", sans-serif; /* títulos */
+  --font-sans: "Barlow", system-ui, sans-serif; /* texto e botões */
+  --font-cond: "Barlow Condensed", "Barlow", sans-serif; /* números: timers, placar, pontos */
+
+  --color-void: #0b0c10; /* fundo da página */
+  --color-abyss: #121318; /* cards */
+  --color-panel: #181a20; /* superfícies elevadas, hover */
+  --color-rim: #24262e; /* bordas e divisórias */
+
+  --color-gold-50: #f2f3f5; /* texto forte */
+  --color-gold-200: #c9a96a; /* acento */
+  --color-gold-300: #b8955a;
+  --color-gold-500: #7d6a45;
+  --color-gold-700: #2b2d36;
+
+  --color-hex-100: #c9f5f1;
+  --color-hex-300: #2cc9b5; /* ao vivo, fila, vitória */
+  --color-hex-500: #1e9e8f;
+  --color-hex-700: #146b62;
+  --color-hex-900: #10302d;
+
+  --color-ash: #9b9ea8; /* texto secundário */
+  --color-ash-dim: #5f626d;
+
+  --color-team-blue: #4f8ff0;
+  --color-team-red: #e5484d;
+}
+
+@layer base {
+  body {
+    @apply bg-void font-sans text-ash antialiased;
+  }
+
+  /* O Tailwind v4 tira a mãozinha dos botões; devolvemos para tudo que é clicável. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  summary,
+  select,
+  label[for] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold-200);
+    outline-offset: 2px;
+  }
+
+  /* Títulos firmes, sem exagero. Fica na camada base, então um font-* explícito no elemento ainda vence. */
+  .font-display {
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  ::selection {
+    background: var(--color-gold-500);
+    color: var(--color-gold-50);
+  }
+}
+
+@layer components {
+  /* Antes eram cantos chanfrados; agora só arredondam (mantidas para não mexer em cada uso). */
+  .bevel {
+    border-radius: 0.5rem;
+  }
+  .bevel-sm {
+    border-radius: 0.375rem;
+  }
+}
+
+/* Entrada de cada fase do lobby: sobe um pouco e ganha foco. */
+@keyframes phase-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.animate-phase-in {
+  animation: phase-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Brilho rápido no segmento da etapa que acabou de começar. */
+@keyframes stage-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgb(200 170 110 / 0);
+  }
+  40% {
+    box-shadow: 0 0 14px 2px rgb(200 170 110 / 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(200 170 110 / 0);
+  }
+}
+
+.animate-stage-glow {
+  animation: stage-glow 1.2s ease-out 0.4s both;
+}
+
+/* Moeda do sorteio dos capitães */
+@keyframes coin-spin {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(1800deg);
+  }
+}
+
+.coin-spin {
+  animation: coin-spin 2.2s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

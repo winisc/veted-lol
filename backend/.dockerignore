@@ -1,0 +1,10 @@
+node_modules
+dist
+scripts
+.env
+.env.*
+*.db
+*.db-shm
+*.db-wal
+Dockerfile
+docker-compose.yml

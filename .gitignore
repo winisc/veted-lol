@@ -1,0 +1,24 @@
+# Dependências e builds
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Segredos: chave da Riot, JWT_SECRET, admins (use backend/.env.example como modelo)
+.env
+.env.*
+!.env.example
+
+# Banco de dados local (contas, senhas com hash, histórico)
+*.db
+*.db-shm
+*.db-wal
+
+# Logs e arquivos de sistema/editor
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.local
