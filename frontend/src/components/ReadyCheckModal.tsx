@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueue } from '../context/QueueContext'
+import { queueModes } from '../lib/modes'
 import HexButton from './ui/HexButton'
 import { CheckIcon } from './ui/icons'
 
@@ -84,6 +85,9 @@ export default function ReadyCheckModal() {
         <h2 id="ready-check-title" className="font-display text-2xl text-gold-50">
           Partida encontrada
         </h2>
+        {snapshot?.mode && (
+          <p className="mt-1 text-xs font-semibold text-gold-200">{queueModes[snapshot.mode].name}</p>
+        )}
         <p id="ready-check-desc" className="mt-1 text-sm text-ash">
           {check.iAccepted
             ? 'Você aceitou. Esperando os outros jogadores...'

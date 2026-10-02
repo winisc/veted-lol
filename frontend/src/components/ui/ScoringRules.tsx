@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import { signed } from '../../lib/format'
-import { StarIcon } from './icons'
+import { FishIcon, StarIcon } from './icons'
 
 interface Scoring {
   win: number
   loss: number
   mvp: number
+  bagre?: number // ausente em servidores antigos
 }
 
 function Rule({ value, label, classes, icon }: { value: string; label: string; classes: string; icon?: ReactNode }) {
@@ -32,6 +33,14 @@ export default function ScoringRules({ scoring, className = '' }: { scoring: Sco
         classes="text-gold-200"
         icon={<StarIcon className="h-4 w-4" />}
       />
+      {scoring.bagre !== undefined && (
+        <Rule
+          value={signed(scoring.bagre)}
+          label="para o bagre"
+          classes="text-bagre"
+          icon={<FishIcon className="h-4 w-4" />}
+        />
+      )}
       <Rule value="0" label="remake não conta" classes="text-gold-50" />
     </ul>
   )

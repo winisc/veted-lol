@@ -1,9 +1,10 @@
+import type { QueueMode } from '../../shared/types/modes'
 import type { MatchOutcome, Side } from '../matches/match.types'
 
 export type { MatchOutcome, Side }
 
 // voting -> captains (resultado) -> coinflip -> side (perdedor escolhe) -> picking -> done (breve)
-//   -> playing (partida em andamento) -> result (votação do vencedor) -> mvp -> finished
+//   -> playing (partida em andamento) -> result (votação do vencedor) -> mvp -> bagre (o pior do time perdedor) -> finished
 //   -> rematch (contagem, se 6 votarem para jogar novamente) -> playing (lados trocados)
 export type LobbyPhase =
   | 'voting'
@@ -15,6 +16,7 @@ export type LobbyPhase =
   | 'playing'
   | 'result'
   | 'mvp'
+  | 'bagre' // votação do pior jogador da partida, entre os perdedores
   | 'finished'
   | 'rematch' // contagem antes da revanche: avisa que os times vão trocar de lado
 
@@ -32,6 +34,8 @@ export interface Pick {
 
 export interface Lobby {
   id: string
+  mode: QueueMode // vote: capitães por votação · ranked: os 2 melhores da tabela
+  rankPositions: Map<number, number | null> // posição de cada jogador na tabela quando o lobby abriu
   players: LobbyPlayer[]
   phase: LobbyPhase
   votes: Map<number, number> // votação de capitães: quem votou -> em quem votou
@@ -53,6 +57,8 @@ export interface Lobby {
   outcome: MatchOutcome | null
   mvpVotes: Map<number, number> // quem votou -> em quem votou
   mvpId: number | null
+  bagreVotes: Map<number, number> // quem votou -> em quem votou
+  bagreId: number | null
   matchId: string // id da partida no histórico; muda a cada revanche
   gameNumber: number // 1 = primeira partida do lobby; sobe a cada "jogar novamente"
   rematchVotes: Set<number> // quem votou para jogar novamente
@@ -85,15 +91,21 @@ export interface MatchSnapshot {
   myMvpVote: number | null
   mvpCounts: Record<number, number> | null // só depois do fim da votação de MVP
   mvpId: number | null
+  bagreCandidates: number[] // jogadores do time perdedor
+  bagreVotedCount: number
+  myBagreVote: number | null
+  bagreCounts: Record<number, number> | null // só depois do fim da votação do bagre
+  bagreId: number | null
   gameNumber: number
   rematchVotes: number
   iVotedRematch: boolean
   rematchAvailable: boolean // false se alguém já saiu do lobby (a revanche precisa dos 10)
 }
 
-// O que cada jogador recebe. Os votos de capitão e de MVP só aparecem depois do fim da votação.
+// O que cada jogador recebe. Os votos de capitão, MVP e bagre só aparecem depois do fim da votação.
 export interface LobbySnapshot {
   id: string
+  mode: QueueMode
   phase: LobbyPhase
   endsAt: number | null
   durationMs: number
@@ -107,6 +119,7 @@ export interface LobbySnapshot {
     votes: number | null
     isCaptain: boolean
     team: Side | null
+    rankPosition: number | null // posição na tabela (null = ainda sem partidas)
   }[]
   myVote: number | null
   votedCount: number

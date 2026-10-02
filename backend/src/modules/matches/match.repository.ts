@@ -3,10 +3,10 @@ import { resolveIconId } from '../../shared/utils/icons'
 import type { AdminMatch, AdminMatchPlayerRow, HistoryRow, MatchOutcome, NewMatch, PlayerStats, RankingRow } from './match.types'
 
 const insertMatch = db.prepare(
-  'INSERT INTO matches (id, started_at, ended_at, duration_seconds, outcome, mvp_user_id) VALUES (?, ?, ?, ?, ?, ?)',
+  'INSERT INTO matches (id, mode, started_at, ended_at, duration_seconds, outcome, mvp_user_id, bagre_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
 )
 const insertPlayer = db.prepare(
-  'INSERT INTO match_players (match_id, user_id, side, is_captain, result, is_mvp) VALUES (?, ?, ?, ?, ?, ?)',
+  'INSERT INTO match_players (match_id, user_id, side, is_captain, result, is_mvp, is_bagre) VALUES (?, ?, ?, ?, ?, ?, ?)',
 )
 
 // Tudo ou nada: a partida e os 10 jogadores são gravados na mesma transação.
@@ -14,16 +14,26 @@ const saveTransaction = db.transaction((match: NewMatch) => {
   const durationSeconds = Math.max(0, Math.round((match.endedAt - match.startedAt) / 1000))
   insertMatch.run(
     match.id,
+    match.mode,
     new Date(match.startedAt).toISOString(),
     new Date(match.endedAt).toISOString(),
     durationSeconds,
     match.outcome,
     match.mvpId,
+    match.bagreId,
   )
 
   for (const player of match.players) {
     const result = match.outcome === 'remake' ? 'remake' : player.side === match.outcome ? 'win' : 'loss'
-    insertPlayer.run(match.id, player.userId, player.side, player.isCaptain ? 1 : 0, result, player.userId === match.mvpId ? 1 : 0)
+    insertPlayer.run(
+      match.id,
+      player.userId,
+      player.side,
+      player.isCaptain ? 1 : 0,
+      result,
+      player.userId === match.mvpId ? 1 : 0,
+      player.userId === match.bagreId ? 1 : 0,
+    )
   }
 })
 
@@ -40,7 +50,8 @@ export const matchRepository = {
            COUNT(*) AS games,
            COALESCE(SUM(result = 'win'), 0) AS wins,
            COALESCE(SUM(result = 'loss'), 0) AS losses,
-           COALESCE(SUM(is_mvp), 0) AS mvps
+           COALESCE(SUM(is_mvp), 0) AS mvps,
+           COALESCE(SUM(is_bagre), 0) AS bagres
          FROM match_players
          WHERE user_id = ? AND result != 'remake'`,
       )
@@ -57,7 +68,8 @@ export const matchRepository = {
            COUNT(*) AS games,
            SUM(mp.result = 'win') AS wins,
            SUM(mp.result = 'loss') AS losses,
-           SUM(mp.is_mvp) AS mvps
+           SUM(mp.is_mvp) AS mvps,
+           SUM(mp.is_bagre) AS bagres
          FROM match_players mp
          JOIN users u ON u.id = mp.user_id
          WHERE mp.result != 'remake'
@@ -73,15 +85,20 @@ export const matchRepository = {
       .prepare(
         `SELECT
            m.id AS matchId, m.ended_at AS endedAt, m.duration_seconds AS durationSeconds,
-           mp.side AS side, mp.result AS result, mp.is_captain AS isCaptain, mp.is_mvp AS isMvp
+           mp.side AS side, mp.result AS result, mp.is_captain AS isCaptain, mp.is_mvp AS isMvp,
+           mp.is_bagre AS isBagre
          FROM match_players mp
          JOIN matches m ON m.id = mp.match_id
          WHERE mp.user_id = ?
          ORDER BY m.ended_at DESC
          LIMIT ?`,
       )
-      .all(userId, limit) as (Omit<HistoryRow, 'isCaptain' | 'isMvp'> & { isCaptain: number; isMvp: number })[]
-    return rows.map((r) => ({ ...r, isCaptain: r.isCaptain === 1, isMvp: r.isMvp === 1 }))
+      .all(userId, limit) as (Omit<HistoryRow, 'isCaptain' | 'isMvp' | 'isBagre'> & {
+      isCaptain: number
+      isMvp: number
+      isBagre: number
+    })[]
+    return rows.map((r) => ({ ...r, isCaptain: r.isCaptain === 1, isMvp: r.isMvp === 1, isBagre: r.isBagre === 1 }))
   },
 
   // ---- Admin ----
@@ -90,8 +107,8 @@ export const matchRepository = {
   listRecent(limit: number): AdminMatch[] {
     const matches = db
       .prepare(
-        `SELECT id, started_at AS startedAt, ended_at AS endedAt, duration_seconds AS durationSeconds,
-                outcome, mvp_user_id AS mvpId
+        `SELECT id, mode, started_at AS startedAt, ended_at AS endedAt, duration_seconds AS durationSeconds,
+                outcome, mvp_user_id AS mvpId, bagre_user_id AS bagreId
          FROM matches ORDER BY ended_at DESC LIMIT ?`,
       )
       .all(limit) as Omit<AdminMatch, 'players'>[]
@@ -114,29 +131,36 @@ export const matchRepository = {
     }))
   },
 
-  // Corrige o resultado de uma partida já salva. Se o MVP ficar no time perdedor (ou virar remake), o MVP é removido.
+  // Corrige o resultado de uma partida já salva. Se o MVP ficar no time perdedor, ou o bagre no vencedor
+  // (ou a partida virar remake), ele é removido.
   updateOutcome(matchId: string, outcome: MatchOutcome): boolean {
     const update = db.transaction(() => {
-      const match = db.prepare('SELECT mvp_user_id AS mvpId FROM matches WHERE id = ?').get(matchId) as
-        | { mvpId: number | null }
-        | undefined
+      const match = db
+        .prepare('SELECT mvp_user_id AS mvpId, bagre_user_id AS bagreId FROM matches WHERE id = ?')
+        .get(matchId) as { mvpId: number | null; bagreId: number | null } | undefined
       if (!match) return false
 
-      let mvpId = match.mvpId
-      if (mvpId !== null) {
-        const mvpSide = (db.prepare('SELECT side FROM match_players WHERE match_id = ? AND user_id = ?').get(matchId, mvpId) as
+      const sideOf = (userId: number) =>
+        (db.prepare('SELECT side FROM match_players WHERE match_id = ? AND user_id = ?').get(matchId, userId) as
           | { side: string }
           | undefined)?.side
-        if (outcome === 'remake' || mvpSide !== outcome) mvpId = null
-      }
+      const decided = outcome !== 'remake'
+      const mvpId = match.mvpId !== null && decided && sideOf(match.mvpId) === outcome ? match.mvpId : null
+      const bagreId = match.bagreId !== null && decided && sideOf(match.bagreId) !== outcome ? match.bagreId : null
 
-      db.prepare('UPDATE matches SET outcome = ?, mvp_user_id = ? WHERE id = ?').run(outcome, mvpId, matchId)
+      db.prepare('UPDATE matches SET outcome = ?, mvp_user_id = ?, bagre_user_id = ? WHERE id = ?').run(
+        outcome,
+        mvpId,
+        bagreId,
+        matchId,
+      )
       db.prepare(
         `UPDATE match_players
          SET result = CASE WHEN ? = 'remake' THEN 'remake' WHEN side = ? THEN 'win' ELSE 'loss' END,
-             is_mvp = CASE WHEN user_id = ? THEN 1 ELSE 0 END
+             is_mvp = CASE WHEN user_id = ? THEN 1 ELSE 0 END,
+             is_bagre = CASE WHEN user_id = ? THEN 1 ELSE 0 END
          WHERE match_id = ?`,
-      ).run(outcome, outcome, mvpId, matchId)
+      ).run(outcome, outcome, mvpId, bagreId, matchId)
       return true
     })
     return update()

@@ -12,7 +12,12 @@ const MATCH_LIMIT = 50
 export const adminService = {
   // Fila, confirmações e lobbies em andamento.
   live() {
-    return { queue: queueService.listForAdmin(), lobbies: lobbyService.listForAdmin() }
+    return {
+      queue: queueService.listForAdmin(),
+      lobbies: lobbyService.listForAdmin(),
+      recentResults: lobbyService.recentResults(),
+      now: Date.now(),
+    }
   },
 
   removeFromQueue(userId: unknown) {
@@ -59,6 +64,7 @@ export const adminService = {
         wins: stats.wins,
         losses: stats.losses,
         mvps: stats.mvps,
+        bagres: stats.bagres,
         winRate: winRate(stats.wins, stats.losses),
         points: computePoints(stats),
       }

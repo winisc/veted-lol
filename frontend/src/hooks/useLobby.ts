@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, tokenStorage } from '../lib/api'
+import { API_BASE, api, tokenStorage } from '../lib/api'
+import type { QueueMode } from '../lib/modes'
 
 export type Side = 'blue' | 'red'
 export type MatchOutcome = Side | 'remake'
@@ -13,6 +14,7 @@ export type LobbyPhase =
   | 'playing'
   | 'result'
   | 'mvp'
+  | 'bagre'
   | 'finished'
   | 'rematch'
 
@@ -25,6 +27,7 @@ export interface LobbyPlayer {
   votes: number | null
   isCaptain: boolean
   team: Side | null
+  rankPosition: number | null // posição na tabela quando o lobby abriu (null = sem partidas)
 }
 
 export interface Pick {
@@ -58,6 +61,11 @@ export interface MatchSnapshot {
   myMvpVote: number | null
   mvpCounts: Record<number, number> | null
   mvpId: number | null
+  bagreCandidates: number[]
+  bagreVotedCount: number
+  myBagreVote: number | null
+  bagreCounts: Record<number, number> | null
+  bagreId: number | null
   gameNumber: number
   rematchVotes: number
   iVotedRematch: boolean
@@ -66,6 +74,7 @@ export interface MatchSnapshot {
 
 export interface LobbySnapshot {
   id: string
+  mode: QueueMode
   phase: LobbyPhase
   endsAt: number | null
   durationMs: number
@@ -99,7 +108,7 @@ export function useLobby() {
     const token = tokenStorage.get()
     if (!token) return
 
-    const source = new EventSource(`/api/lobby/events?access_token=${encodeURIComponent(token)}`)
+    const source = new EventSource(`${API_BASE}/lobby/events?access_token=${encodeURIComponent(token)}`)
     source.onopen = () => setConnected(true)
     source.onerror = () => setConnected(false)
     source.onmessage = (event) => {
@@ -131,17 +140,21 @@ export function useLobby() {
   const voteEnd = useCallback((value: boolean) => act('/lobby/end', { vote: value }), [act])
   const voteResult = useCallback((choice: MatchOutcome) => act('/lobby/result', { choice }), [act])
   const voteMvp = useCallback((targetId: number) => act('/lobby/mvp', { targetId }), [act])
+  const voteBagre = useCallback((targetId: number) => act('/lobby/bagre', { targetId }), [act])
   const voteRematch = useCallback((value: boolean) => act('/lobby/rematch', { vote: value }), [act])
 
+  // Devolve se conseguiu sair (para quem quer emendar outra ação, como entrar na fila de novo).
   const leave = useCallback(async () => {
     setBusy(true)
     setError('')
     try {
       await api('/lobby/leave', { method: 'POST' })
       setState({ lobby: null, skew: 0 })
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado.')
       setBusy(false)
+      return false
     }
   }, [])
 
@@ -156,6 +169,7 @@ export function useLobby() {
     voteEnd,
     voteResult,
     voteMvp,
+    voteBagre,
     voteRematch,
     leave,
   }

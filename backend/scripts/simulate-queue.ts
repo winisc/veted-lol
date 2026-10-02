@@ -2,12 +2,13 @@
 //
 //   npm run sim:queue                  -> 9 bots na fila (você entra como o 10º)
 //   npm run sim:queue -- --count=4     -> outra quantidade de bots
+//   npm run sim:queue -- --mode=ranked -> bots na fila do modo tabela (padrão: modo capitão)
 //   npm run sim:queue -- --match-seconds=60  -> duração da partida antes de os bots a encerrarem (padrão 20)
 //   npm run sim:queue -- --clean       -> apaga as contas dos bots e as partidas de teste do histórico
 //
 // O backend precisa estar rodando. Mantenha este script aberto: os bots saem da fila quando ele fecha (Ctrl+C).
 // No lobby, os bots votam em alguém aleatório e, se forem capitães, escolhem o lado e fazem os picks.
-// Na partida, encerram, votam no vencedor e no MVP. Na tela final, topam a revanche depois que VOCÊ votar.
+// Na partida, encerram, votam no vencedor, no MVP e no bagre. Na tela final, topam a revanche depois que VOCÊ votar.
 // Quando você sai (ou se o lobby for cancelado), os bots voltam para a fila.
 // ATENÇÃO: partidas jogadas com bots são salvas no histórico. Use --clean para apagá-las.
 import 'dotenv/config'
@@ -27,6 +28,8 @@ const args = process.argv.slice(2)
 const count = Number(args.find((a) => a.startsWith('--count='))?.split('=')[1]) || 9
 // Quanto tempo a partida dura antes de os bots votarem para encerrá-la.
 const MATCH_SECONDS = Number(args.find((a) => a.startsWith('--match-seconds='))?.split('=')[1]) || 20
+// Fila em que os bots entram: vote (capitães por votação, padrão) ou ranked (capitães pela tabela).
+const MODE = args.find((a) => a.startsWith('--mode='))?.split('=')[1] === 'ranked' ? 'ranked' : 'vote'
 
 interface LobbyPlayer {
   id: number
@@ -35,10 +38,10 @@ interface LobbyPlayer {
 }
 interface LobbySnapshot {
   id: string
-  phase: 'voting' | 'captains' | 'coinflip' | 'side' | 'picking' | 'done' | 'playing' | 'result' | 'mvp' | 'finished' | 'rematch'
+  phase: 'voting' | 'captains' | 'coinflip' | 'side' | 'picking' | 'done' | 'playing' | 'result' | 'mvp' | 'bagre' | 'finished' | 'rematch'
   players: LobbyPlayer[]
   draft: { currentTurnId: number | null; pickIndex: number }
-  match: { mvpCandidates: number[]; gameNumber: number; rematchVotes: number; rematchAvailable: boolean }
+  match: { mvpCandidates: number[]; bagreCandidates: number[]; gameNumber: number; rematchVotes: number; rematchAvailable: boolean }
 }
 
 interface Bot {
@@ -99,8 +102,8 @@ async function stream(path: string, token: string, onEvent: (data: any) => void)
 }
 
 async function joinQueue(bot: Bot) {
-  const snap = await post<{ size: number; required: number }>('/queue/join', bot.token)
-  console.log(`  ${bot.riotId} entrou na fila (${snap.size}/${snap.required})`)
+  const snap = await post<{ size: number; required: number }>('/queue/join', bot.token, { mode: MODE })
+  console.log(`  ${bot.riotId} entrou na fila ${MODE === 'ranked' ? 'da tabela' : 'da votação'} (${snap.size}/${snap.required})`)
 }
 
 function onLobbyEvent(bot: Bot, lobby: LobbySnapshot | null) {
@@ -143,6 +146,9 @@ function onLobbyEvent(bot: Bot, lobby: LobbySnapshot | null) {
   } else if (lobby.phase === 'mvp') {
     const candidates = lobby.match.mvpCandidates.filter((id) => id !== bot.id)
     if (candidates.length > 0) act('mvp', '/lobby/mvp', { targetId: random(candidates) }, ACTION_DELAY_RANGE_MS)
+  } else if (lobby.phase === 'bagre') {
+    const candidates = lobby.match.bagreCandidates.filter((id) => id !== bot.id)
+    if (candidates.length > 0) act('bagre', '/lobby/bagre', { targetId: random(candidates) }, ACTION_DELAY_RANGE_MS)
   } else if (lobby.phase === 'finished') {
     if (!lobby.match.rematchAvailable) {
       // Alguém (você) saiu: acabou. O bot sai e (pelo evento "sem lobby" acima) volta para a fila.
@@ -168,7 +174,7 @@ async function ensureBotUsers(): Promise<string[]> {
 async function main() {
   if (args.includes('--clean')) {
     // Partidas com bots são de teste: somem do histórico (inclusive as linhas de quem jogou com eles),
-    // senão contariam nas vitórias/derrotas/MVPs dos jogadores reais.
+    // senão contariam nas vitórias/derrotas/MVPs/bagres dos jogadores reais.
     const clean = db.transaction(() => {
       const isBot = "SELECT id FROM users WHERE tag_line = ? COLLATE NOCASE"
       const testMatches = `SELECT match_id FROM match_players WHERE user_id IN (${isBot})`

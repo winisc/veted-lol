@@ -1,21 +1,66 @@
 import { useElapsed } from '../hooks/useElapsed'
 import type { LobbySnapshot, Side } from '../hooks/useLobby'
+import { queueModes } from '../lib/modes'
 import { formatDuration, sideStyle, splitRiotId, teamMembers } from '../lib/teams'
 import TeamCard from './TeamCard'
 import { YouBadge } from './ui/Badges'
+import type { LobbyPlayer } from '../hooks/useLobby'
+import type { ReactNode } from 'react'
 import HexButton from './ui/HexButton'
-import { StarIcon } from './ui/icons'
-import SummonerIcon from './ui/SummonerIcon'
+import { FishIcon, StarIcon } from './ui/icons'
+import SummonerIcon, { type IconRing } from './ui/SummonerIcon'
+
+// Destaque da partida (MVP ou bagre) com o número de votos que recebeu.
+function AwardCard({
+  player,
+  votes,
+  label,
+  icon,
+  ring,
+  classes,
+  empty,
+}: {
+  player: LobbyPlayer | undefined
+  votes: number
+  label: string
+  icon: ReactNode
+  ring: IconRing
+  classes: string
+  empty: string
+}) {
+  return (
+    <div className={`flex min-w-60 flex-1 items-center gap-3 rounded-xl border px-4 py-3 ${classes}`}>
+      {player ? (
+        <>
+          <SummonerIcon iconId={player.iconId} size="lg" ring={ring} />
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 font-display text-sm">
+              {icon} {label}
+            </p>
+            <p className="truncate font-display text-2xl leading-tight text-gold-50">{splitRiotId(player.riotId)[0]}</p>
+            <p className="flex items-center gap-2 text-sm text-ash">
+              {votes} {votes === 1 ? 'voto' : 'votos'}
+              {player.isYou && <YouBadge />}
+            </p>
+          </div>
+        </>
+      ) : (
+        <p className="w-full text-center text-sm text-ash">{empty}</p>
+      )}
+    </div>
+  )
+}
 
 interface Props {
   lobby: LobbySnapshot
   skew: number
   busy: boolean
   onRematch: (value: boolean) => void
+  onRequeue: () => void
 }
 
 // Tela de fim de jogo, no estilo "Vitória / Derrota" do LoL.
-export default function LobbyFinished({ lobby, skew, busy, onRematch }: Props) {
+export default function LobbyFinished({ lobby, skew, busy, onRematch, onRequeue }: Props) {
   const { match } = lobby
   const duration = useElapsed(match.startedAt, skew, match.endedAt)
   const me = lobby.players.find((p) => p.isYou)
@@ -24,6 +69,8 @@ export default function LobbyFinished({ lobby, skew, busy, onRematch }: Props) {
   const won = !remake && me?.team === winnerSide
   const mvp = lobby.players.find((p) => p.id === match.mvpId)
   const mvpVotes = mvp && match.mvpCounts ? (match.mvpCounts[mvp.id] ?? 0) : 0
+  const bagre = lobby.players.find((p) => p.id === match.bagreId)
+  const bagreVotes = bagre && match.bagreCounts ? (match.bagreCounts[bagre.id] ?? 0) : 0
 
   const headline = remake ? 'Remake' : won ? 'Vitória' : 'Derrota'
   const headlineColor = remake ? 'text-gold-50' : won ? 'text-hex-100' : 'text-team-red'
@@ -32,7 +79,7 @@ export default function LobbyFinished({ lobby, skew, busy, onRematch }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Resultado e MVP lado a lado */}
+      {/* Resultado, MVP e bagre lado a lado */}
       <div className="grid items-center gap-4 md:grid-cols-[1fr_auto]">
         <div className="text-center md:text-left">
           <p
@@ -49,31 +96,39 @@ export default function LobbyFinished({ lobby, skew, busy, onRematch }: Props) {
         </div>
 
         {!remake && (
-          <div className="flex min-w-72 items-center gap-4 rounded-xl border border-gold-200/40 bg-gold-200/[0.06] px-4 py-3">
-            {mvp ? (
-              <>
-                <SummonerIcon iconId={mvp.iconId} size="lg" ring="gold" glow />
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 font-display text-sm text-gold-200">
-                    <StarIcon className="h-4 w-4" /> MVP da partida
-                  </p>
-                  <p className="truncate font-display text-2xl leading-tight text-gold-50">{splitRiotId(mvp.riotId)[0]}</p>
-                  <p className="flex items-center gap-2 text-sm text-ash">
-                    {mvpVotes} {mvpVotes === 1 ? 'voto' : 'votos'}
-                    {mvp.isYou && <YouBadge />}
-                  </p>
-                </div>
-              </>
-            ) : (
-              <p className="w-full text-center text-sm text-ash">Ninguém votou, então não houve MVP.</p>
-            )}
+          <div className="flex flex-wrap gap-3">
+            <AwardCard
+              player={mvp}
+              votes={mvpVotes}
+              label="MVP da partida"
+              icon={<StarIcon className="h-4 w-4" />}
+              ring="gold"
+              classes="border-gold-200/40 bg-gold-200/[0.06] text-gold-200"
+              empty="Ninguém votou, então não houve MVP."
+            />
+            <AwardCard
+              player={bagre}
+              votes={bagreVotes}
+              label="Bagre da partida"
+              icon={<FishIcon className="h-4 w-4" />}
+              ring="bagre"
+              classes="border-bagre/40 bg-bagre/[0.06] text-bagre"
+              empty="Ninguém votou, então não houve bagre."
+            />
           </div>
         )}
       </div>
 
       <div className="grid items-start gap-3 md:grid-cols-2">
         {(['blue', 'red'] as Side[]).map((side) => (
-          <TeamCard key={side} side={side} members={teamMembers(lobby, side)} mvpId={match.mvpId} winner={winnerSide === side} />
+          <TeamCard
+            key={side}
+            side={side}
+            members={teamMembers(lobby, side)}
+            mvpId={match.mvpId}
+            bagreId={match.bagreId}
+            winner={winnerSide === side}
+          />
         ))}
       </div>
 
@@ -112,6 +167,16 @@ export default function LobbyFinished({ lobby, skew, busy, onRematch }: Props) {
           Alguém já saiu do lobby, então não dá para jogar novamente.
         </p>
       )}
+
+      {/* Sair e já procurar outra partida, no mesmo modo de fila. */}
+      <div className="flex flex-col items-center gap-1.5 border-t border-rim pt-4">
+        <HexButton variant="secondary" onClick={onRequeue} disabled={busy}>
+          Entrar na fila novamente
+        </HexButton>
+        <p className="text-xs text-ash">
+          Sai do lobby e entra na fila do {queueModes[lobby.mode ?? 'vote'].name.toLowerCase()}.
+        </p>
+      </div>
     </div>
   )
 }

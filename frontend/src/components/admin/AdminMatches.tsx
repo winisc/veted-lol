@@ -3,21 +3,24 @@ import { useAction } from '../../hooks/useAction'
 import { useApi } from '../../hooks/useApi'
 import type { MatchOutcome, Side } from '../../hooks/useLobby'
 import { api } from '../../lib/api'
+import { queueModes, type QueueMode } from '../../lib/modes'
 import { formatDateTime } from '../../lib/format'
 import { formatDuration, sideStyle, splitRiotId } from '../../lib/teams'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import HexButton from '../ui/HexButton'
-import { CrownIcon, StarIcon } from '../ui/icons'
+import { CrownIcon, FishIcon, StarIcon } from '../ui/icons'
 import SummonerIcon from '../ui/SummonerIcon'
 import { ActionFeedback, Empty, RowAction, outcomeBadge, outcomeLabel } from './adminShared'
 
 interface AdminMatch {
   id: string
+  mode: QueueMode
   startedAt: string
   endedAt: string
   durationSeconds: number
   outcome: MatchOutcome
   mvpId: number | null
+  bagreId: number | null
   players: { userId: number; riotId: string; iconId: number; side: Side; isCaptain: boolean }[]
 }
 
@@ -50,17 +53,24 @@ export default function AdminMatches() {
         <ul className="space-y-3">
           {data.matches.map((match) => {
             const mvp = match.players.find((p) => p.userId === match.mvpId)
+            const bagre = match.players.find((p) => p.userId === match.bagreId)
             return (
               <li key={match.id} className="rounded-xl border border-rim bg-abyss p-4">
                 <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                   <span className={`rounded px-2 py-0.5 text-xs font-semibold ${outcomeBadge[match.outcome]}`}>
                     {outcomeLabel[match.outcome]}
                   </span>
+                  <span className="rounded bg-rim px-2 py-0.5 text-xs font-semibold text-gold-50">{queueModes[match.mode].name}</span>
                   <span className="text-sm text-ash">{formatDateTime(match.endedAt)}</span>
                   <span className="font-cond text-sm text-ash">{formatDuration(match.durationSeconds)}</span>
                   {mvp && (
                     <span className="flex items-center gap-1 text-sm text-gold-200">
                       <StarIcon className="h-3.5 w-3.5" /> MVP {splitRiotId(mvp.riotId)[0]}
+                    </span>
+                  )}
+                  {bagre && (
+                    <span className="flex items-center gap-1 text-sm text-bagre">
+                      <FishIcon className="h-3.5 w-3.5" /> Bagre {splitRiotId(bagre.riotId)[0]}
                     </span>
                   )}
                   <div className="ml-auto flex gap-1.5">
@@ -133,8 +143,8 @@ export default function AdminMatches() {
         }
       >
         <p className="text-sm text-ash">
-          Vitórias, derrotas e pontos de todos os jogadores da partida são recalculados. Se o MVP ficar no time que perdeu
-          (ou virar remake), o MVP é removido.
+          Vitórias, derrotas e pontos de todos os jogadores da partida são recalculados. Se o MVP ficar no time que perdeu,
+          ou o bagre no time que venceu (ou virar remake), ele é removido.
         </p>
       </ConfirmDialog>
 

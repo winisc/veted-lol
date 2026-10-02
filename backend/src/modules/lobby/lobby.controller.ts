@@ -7,6 +7,10 @@ export const lobbyController = {
     res.json({ lobby: lobbyService.current(req.userId!) })
   },
 
+  live(_req: AuthRequest, res: Response) {
+    res.json({ ...lobbyService.listLive(), now: Date.now() })
+  },
+
   vote(req: AuthRequest, res: Response) {
     res.json({ lobby: lobbyService.vote(req.userId!, req.body?.targetId) })
   },
@@ -29,6 +33,10 @@ export const lobbyController = {
 
   mvp(req: AuthRequest, res: Response) {
     res.json({ lobby: lobbyService.voteMvp(req.userId!, req.body?.targetId) })
+  },
+
+  bagre(req: AuthRequest, res: Response) {
+    res.json({ lobby: lobbyService.voteBagre(req.userId!, req.body?.targetId) })
   },
 
   rematch(req: AuthRequest, res: Response) {

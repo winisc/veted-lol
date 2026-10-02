@@ -4,7 +4,7 @@ import { queueService } from './queue.service'
 
 export const queueController = {
   join(req: AuthRequest, res: Response) {
-    res.json(queueService.join(req.userId!))
+    res.json(queueService.join(req.userId!, req.body?.mode ?? 'vote'))
   },
 
   leave(req: AuthRequest, res: Response) {

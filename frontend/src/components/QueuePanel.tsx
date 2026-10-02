@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQueue, type QueueSnapshot } from '../context/QueueContext'
+import { queueModeOrder, queueModes, type QueueMode } from '../lib/modes'
 import { formatDuration, splitRiotId } from '../lib/teams'
 import HexButton, { HexLink } from './ui/HexButton'
 import Notice from './ui/Notice'
@@ -39,8 +40,17 @@ function useElapsedSeconds() {
   return seconds
 }
 
-function QueuedView({ snapshot, busy, onLeave }: { snapshot: QueueSnapshot; busy: boolean; onLeave: () => void }) {
+interface QueuedViewProps {
+  snapshot: QueueSnapshot
+  busy: boolean
+  onLeave: () => void
+  onSwitch: (mode: QueueMode) => void
+}
+
+function QueuedView({ snapshot, busy, onLeave, onSwitch }: QueuedViewProps) {
   const elapsed = useElapsedSeconds()
+  const mode = snapshot.mode ?? 'vote'
+  const other: QueueMode = mode === 'vote' ? 'ranked' : 'vote'
 
   return (
     <div className="space-y-6">
@@ -52,6 +62,9 @@ function QueuedView({ snapshot, busy, onLeave }: { snapshot: QueueSnapshot; busy
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-hex-300" />
             </span>
             Procurando partida
+            <span className="rounded bg-gold-200/15 px-2 py-0.5 font-sans text-xs font-semibold text-gold-200">
+              {queueModes[mode].name}
+            </span>
           </p>
           <p className="mt-1 text-sm text-ash">
             Tempo na fila <span className="font-cond text-base font-semibold tabular-nums text-gold-50">{formatDuration(elapsed)}</span>
@@ -79,9 +92,51 @@ function QueuedView({ snapshot, busy, onLeave }: { snapshot: QueueSnapshot; busy
 
       <QueueSlots snapshot={snapshot} />
 
-      <HexButton variant="secondary" onClick={onLeave} disabled={busy}>
-        Sair da fila
-      </HexButton>
+      <div className="flex flex-wrap items-center gap-3">
+        <HexButton variant="secondary" onClick={onLeave} disabled={busy}>
+          Sair da fila
+        </HexButton>
+        <button
+          type="button"
+          onClick={() => onSwitch(other)}
+          disabled={busy}
+          className="text-sm text-ash transition-colors hover:text-gold-50 disabled:opacity-50"
+        >
+          Trocar para o {queueModes[other].name.toLowerCase()} ({snapshot.sizes?.[other] ?? 0}/{snapshot.required})
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Fora da fila: um cartão por modo, cada um com a sua fila.
+function ModePicker({ snapshot, busy, onJoin }: { snapshot: QueueSnapshot; busy: boolean; onJoin: (mode: QueueMode) => void }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {queueModeOrder.map((mode) => {
+        const info = queueModes[mode]
+        const waiting = snapshot.sizes?.[mode] ?? (snapshot.mode === mode ? snapshot.size : 0)
+        return (
+          <div key={mode} className="flex flex-col gap-3 rounded-xl border border-rim bg-abyss/85 p-4 backdrop-blur-sm">
+            <div>
+              <p className="font-display text-xl text-gold-50">{info.name}</p>
+              <p className="mt-0.5 text-sm text-ash">{info.description}</p>
+            </div>
+            <div className="mt-auto flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-sm text-gold-50/80">
+                <span className={`h-2 w-2 rounded-full ${waiting > 0 ? 'bg-hex-300' : 'bg-ash-dim'}`} />
+                <span className="font-cond text-base font-semibold tabular-nums">
+                  {waiting}/{snapshot.required}
+                </span>
+                na fila
+              </span>
+              <HexButton onClick={() => onJoin(mode)} disabled={busy}>
+                Entrar na fila
+              </HexButton>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -93,19 +148,11 @@ export default function QueuePanel() {
     <div className="space-y-4">
       {!snapshot && <p className="text-ash">Conectando à fila...</p>}
 
-      {snapshot?.status === 'idle' && (
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <HexButton size="lg" onClick={join} disabled={busy}>
-            Encontrar partida
-          </HexButton>
-          <p className="flex items-center gap-2 text-sm text-gold-50/80">
-            <span className="h-2 w-2 rounded-full bg-hex-300" />
-            {snapshot.size === 1 ? '1 jogador na fila agora' : `${snapshot.size} jogadores na fila agora`}
-          </p>
-        </div>
-      )}
+      {snapshot?.status === 'idle' && <ModePicker snapshot={snapshot} busy={busy} onJoin={join} />}
 
-      {snapshot?.status === 'queued' && <QueuedView snapshot={snapshot} busy={busy} onLeave={leave} />}
+      {snapshot?.status === 'queued' && (
+        <QueuedView snapshot={snapshot} busy={busy} onLeave={leave} onSwitch={join} />
+      )}
 
       {snapshot?.status === 'ready_check' && (
         <p className="flex items-center gap-2 font-display text-xl text-gold-50">

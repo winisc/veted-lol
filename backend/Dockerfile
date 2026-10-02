@@ -1,5 +1,9 @@
 FROM node:22-slim AS build
 
+# better-sqlite3 é nativo e precisa compilar
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -7,15 +11,14 @@ RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
 FROM node:22-slim
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --omit=dev
-
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 
 # O banco SQLite fica num volume, fora da imagem

@@ -5,22 +5,24 @@ export const scoring = {
   win: 25,
   loss: -15,
   mvp: 5, // bônus por ser MVP (só quem venceu pode ser MVP)
+  bagre: -2, // desconto por ser o bagre (só quem perdeu pode ser bagre)
 }
 
 export interface WinLossRecord {
   wins: number
   losses: number
   mvps: number
+  bagres: number
 }
 
-export function computePoints({ wins, losses, mvps }: WinLossRecord) {
-  return wins * scoring.win + losses * scoring.loss + mvps * scoring.mvp
+export function computePoints({ wins, losses, mvps, bagres }: WinLossRecord) {
+  return wins * scoring.win + losses * scoring.loss + mvps * scoring.mvp + bagres * scoring.bagre
 }
 
 // Pontos ganhos ou perdidos em uma única partida.
-export function matchPoints(result: 'win' | 'loss' | 'remake', isMvp: boolean) {
+export function matchPoints(result: 'win' | 'loss' | 'remake', isMvp: boolean, isBagre: boolean) {
   if (result === 'win') return scoring.win + (isMvp ? scoring.mvp : 0)
-  if (result === 'loss') return scoring.loss
+  if (result === 'loss') return scoring.loss + (isBagre ? scoring.bagre : 0)
   return 0
 }
 

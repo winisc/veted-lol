@@ -65,6 +65,16 @@ export function StarIcon({ className = 'h-4 w-4' }: Props) {
   )
 }
 
+// Peixe (bagre): o pior jogador da partida.
+export function FishIcon({ className = 'h-4 w-4' }: Props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={`${base} ${className}`} aria-hidden="true">
+      <path d="M2.5 12c2.4-3.6 5.6-5.5 9.3-5.5 3.3 0 5.8 1.6 7.4 3.6L22 7.5v9l-2.8-2.6c-1.6 2-4.1 3.6-7.4 3.6-3.7 0-6.9-1.9-9.3-5.5Zm5.3-1.4a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Z" />
+      <path d="M3.4 11.2 1 10.4M3.4 12.8 1 13.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+    </svg>
+  )
+}
+
 export function CheckIcon({ className = 'h-3.5 w-3.5' }: Props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`${base} ${className}`} aria-hidden="true">

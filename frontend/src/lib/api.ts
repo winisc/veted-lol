@@ -1,5 +1,9 @@
 const TOKEN_KEY = 'token'
 
+// Endereço da API. Em desenvolvimento fica vazio e o Vite repassa /api para o backend local.
+// Em produção (ex.: Cloudflare Pages) defina VITE_API_URL no build com a URL pública do backend.
+export const API_BASE = `${(import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')}/api`
+
 export const tokenStorage = {
   get: () => localStorage.getItem(TOKEN_KEY),
   set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
@@ -20,7 +24,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
 
   let res: Response
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(`${API_BASE}${path}`, {
       method: options.method ?? (options.body ? 'POST' : 'GET'),
       headers: {
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),

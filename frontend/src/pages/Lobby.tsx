@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import LobbyAwardVote from '../components/LobbyAwardVote'
 import LobbyCaptains from '../components/LobbyCaptains'
 import LobbyCoinFlip from '../components/LobbyCoinFlip'
 import LobbyDraft from '../components/LobbyDraft'
 import LobbyFinished from '../components/LobbyFinished'
-import LobbyMvp from '../components/LobbyMvp'
 import LobbyPlaying from '../components/LobbyPlaying'
 import LobbyRematch from '../components/LobbyRematch'
 import LobbyResult from '../components/LobbyResult'
@@ -13,8 +13,10 @@ import LobbyVoting from '../components/LobbyVoting'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import HexButton from '../components/ui/HexButton'
 import Notice from '../components/ui/Notice'
+import { useQueue } from '../context/QueueContext'
 import { useLobby, type LobbyPhase } from '../hooks/useLobby'
 import { pageSplash } from '../lib/ddragon'
+import { queueModes } from '../lib/modes'
 
 // Etapas mostradas no topo, na ordem do lobby. Cada fase do servidor cai em uma delas.
 const stages: { label: string; phases: LobbyPhase[] }[] = [
@@ -22,7 +24,7 @@ const stages: { label: string; phases: LobbyPhase[] }[] = [
   { label: 'Sorteio', phases: ['coinflip', 'side'] },
   { label: 'Draft', phases: ['picking', 'done'] },
   { label: 'Partida', phases: ['playing'] },
-  { label: 'Resultado', phases: ['result', 'mvp'] },
+  { label: 'Resultado', phases: ['result', 'mvp', 'bagre'] },
   { label: 'Fim', phases: ['finished', 'rematch'] },
 ]
 
@@ -70,10 +72,12 @@ export default function Lobby() {
     voteEnd,
     voteResult,
     voteMvp,
+    voteBagre,
     voteRematch,
     leave,
   } = useLobby()
   const navigate = useNavigate()
+  const queue = useQueue()
   const [confirmingLeave, setConfirmingLeave] = useState(false)
 
   // Sem lobby (nunca entrou, ou foi cancelado): volta para o início, avisando o motivo se houver.
@@ -86,13 +90,19 @@ export default function Lobby() {
   const finished = lobby.phase === 'finished'
   const rematching = lobby.phase === 'rematch'
   // Durante a partida não dá para sair (o servidor também bloqueia).
-  const inMatch = lobby.phase === 'playing' || lobby.phase === 'result' || lobby.phase === 'mvp'
+  const inMatch = lobby.phase === 'playing' || lobby.phase === 'result' || lobby.phase === 'mvp' || lobby.phase === 'bagre'
 
   // Antes da partida começar, sair cancela o lobby para todos (na contagem da revanche, cancela a revanche):
   // por isso pede confirmação. Depois da partida, cada um sai por si, sem perguntar.
   function handleLeave() {
     if (finished) leave()
     else setConfirmingLeave(true)
+  }
+
+  // Fim de jogo: sai do lobby e já entra na fila do mesmo modo.
+  async function requeue() {
+    const mode = lobby!.mode ?? 'vote'
+    if (await leave()) await queue.join(mode)
   }
 
   function confirmLeave() {
@@ -115,6 +125,9 @@ export default function Lobby() {
           {lobby.match.gameNumber > 1 && (
             <span className="ml-2 font-cond text-sm font-semibold text-gold-200">Partida {lobby.match.gameNumber}</span>
           )}
+          <span className="ml-2 rounded bg-gold-200/15 px-1.5 py-0.5 align-middle font-sans text-xs font-semibold text-gold-200">
+            {queueModes[lobby.mode ?? 'vote'].short}
+          </span>
         </h1>
         <div className="order-last w-full md:order-0 md:w-auto md:flex-1">
           <StageBar phase={lobby.phase} />
@@ -147,8 +160,11 @@ export default function Lobby() {
           )}
           {lobby.phase === 'playing' && <LobbyPlaying lobby={lobby} skew={skew} busy={busy} onVoteEnd={voteEnd} />}
           {lobby.phase === 'result' && <LobbyResult lobby={lobby} skew={skew} busy={busy} onVote={voteResult} />}
-          {lobby.phase === 'mvp' && <LobbyMvp lobby={lobby} skew={skew} busy={busy} onVote={voteMvp} />}
-          {finished && <LobbyFinished lobby={lobby} skew={skew} busy={busy} onRematch={voteRematch} />}
+          {lobby.phase === 'mvp' && <LobbyAwardVote kind="mvp" lobby={lobby} skew={skew} busy={busy} onVote={voteMvp} />}
+          {lobby.phase === 'bagre' && (
+            <LobbyAwardVote kind="bagre" lobby={lobby} skew={skew} busy={busy} onVote={voteBagre} />
+          )}
+          {finished && <LobbyFinished lobby={lobby} skew={skew} busy={busy || queue.busy} onRematch={voteRematch} onRequeue={requeue} />}
           {rematching && <LobbyRematch lobby={lobby} skew={skew} />}
         </div>
       </section>

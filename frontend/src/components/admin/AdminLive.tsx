@@ -3,12 +3,14 @@ import { useAction } from '../../hooks/useAction'
 import { useApi } from '../../hooks/useApi'
 import type { LobbyPhase, MatchOutcome, Side } from '../../hooks/useLobby'
 import { api } from '../../lib/api'
+import { queueModes, type QueueMode } from '../../lib/modes'
 import { formatDuration, sideStyle, splitRiotId } from '../../lib/teams'
 import HexButton from '../ui/HexButton'
 import { CheckIcon, CrownIcon } from '../ui/icons'
 import Panel from '../ui/Panel'
 import SummonerIcon from '../ui/SummonerIcon'
 import ConfirmDialog from '../ui/ConfirmDialog'
+import MatchResultCard, { useVisibleResults, type RecentResult } from '../MatchResultCard'
 import { ActionFeedback, Empty, RowAction, matchPhases, phaseLabel } from './adminShared'
 
 interface Player {
@@ -20,17 +22,20 @@ interface Player {
 interface LiveResponse {
   queue: {
     required: number
-    waiting: Player[]
-    readyChecks: { id: string; endsAt: number; players: (Player & { accepted: boolean })[] }[]
+    waiting: (Player & { mode: QueueMode })[]
+    readyChecks: { id: string; mode: QueueMode; endsAt: number; players: (Player & { accepted: boolean })[] }[]
   }
   lobbies: {
     id: string
+    mode: QueueMode
     phase: LobbyPhase
     gameNumber: number
     createdAt: number
     startedAt: number | null
     players: (Player & { team: Side | null; isCaptain: boolean })[]
   }[]
+  recentResults?: RecentResult[] // partidas que acabaram de terminar (resumo por alguns segundos)
+  now?: number
 }
 
 type Pending =
@@ -56,6 +61,7 @@ export default function AdminLive() {
   const { busy, message, run, clear } = useAction()
   const [pending, setPending] = useState<Pending | null>(null)
   const close = () => setPending(null)
+  const { now, visible: recent } = useVisibleResults(data?.recentResults, data?.now ? data.now - Date.now() : 0)
 
   async function act(action: () => Promise<unknown>, success: string) {
     await run(action, success, reload)
@@ -71,6 +77,16 @@ export default function AdminLive() {
     <div className="space-y-4">
       <ActionFeedback message={message} onClose={clear} />
       <p className="text-xs text-ash">Atualiza sozinho a cada {REFRESH_MS / 1000} segundos.</p>
+
+      {recent.length > 0 && (
+        <Panel title="Acabaram de terminar">
+          <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {recent.map((result) => (
+              <MatchResultCard key={result.matchId} result={result} now={now} />
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       <div className="grid items-start gap-4 lg:grid-cols-[1fr_1.6fr]">
         {/* Fila e confirmações */}
@@ -95,7 +111,9 @@ export default function AdminLive() {
                   <li key={p.id} className="flex items-center gap-2">
                     <span className="w-5 text-right font-cond text-sm text-ash-dim">{i + 1}</span>
                     <div className="min-w-0 flex-1">
-                      <PlayerChip player={p} />
+                      <PlayerChip player={p}>
+                        <span className="ml-auto text-[11px] text-ash">{queueModes[p.mode].short}</span>
+                      </PlayerChip>
                     </div>
                     <RowAction disabled={busy} onClick={() => setPending({ kind: 'remove', player: p })}>
                       Tirar
@@ -108,7 +126,7 @@ export default function AdminLive() {
             {queue.readyChecks.map((check) => (
               <div key={check.id} className="rounded-lg border border-gold-200/30 bg-gold-200/[0.05] p-3">
                 <p className="mb-2 text-sm font-semibold text-gold-200">
-                  Confirmação de partida · {check.players.filter((p) => p.accepted).length}/{check.players.length} aceitaram
+                  Confirmação de partida ({queueModes[check.mode].short}) · {check.players.filter((p) => p.accepted).length}/{check.players.length} aceitaram
                 </p>
                 <ul className="grid gap-1.5 sm:grid-cols-2">
                   {check.players.map((p) => (
@@ -157,6 +175,9 @@ export default function AdminLive() {
                         }`}
                       >
                         {phaseLabel[lobby.phase]}
+                      </span>
+                      <span className="rounded bg-gold-200/15 px-2 py-0.5 text-xs font-semibold text-gold-200">
+                        {queueModes[lobby.mode].short}
                       </span>
                       {lobby.gameNumber > 1 && <span className="text-xs text-ash">Partida {lobby.gameNumber}</span>}
                       {lobby.startedAt && inMatch && (
@@ -304,7 +325,7 @@ export default function AdminLive() {
         }
       >
         <p className="text-sm text-ash">
-          A partida termina agora com o resultado escolhido, sem votação de MVP, e vai para o histórico.
+          A partida termina agora com o resultado escolhido, sem votação de MVP nem de bagre, e vai para o histórico.
         </p>
       </ConfirmDialog>
     </div>

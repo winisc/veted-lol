@@ -1,6 +1,6 @@
 import type { LobbyPlayer, Side } from '../hooks/useLobby'
 import { sideStyle } from '../lib/teams'
-import { CaptainBadge, MvpBadge, YouBadge } from './ui/Badges'
+import { BagreBadge, CaptainBadge, MvpBadge, YouBadge } from './ui/Badges'
 import PlayerRow from './ui/PlayerRow'
 
 interface Props {
@@ -8,11 +8,12 @@ interface Props {
   members: LobbyPlayer[]
   slots?: number // mostra vagas vazias até esse total ("Aguardando pick...")
   mvpId?: number | null
+  bagreId?: number | null
   winner?: boolean
   title?: string
 }
 
-export default function TeamCard({ side, members, slots, mvpId, winner, title }: Props) {
+export default function TeamCard({ side, members, slots, mvpId, bagreId, winner, title }: Props) {
   const style = sideStyle[side]
   const rows = Array.from({ length: Math.max(slots ?? 0, members.length) }, (_, i) => members[i])
 
@@ -32,12 +33,13 @@ export default function TeamCard({ side, members, slots, mvpId, winner, title }:
               <PlayerRow
                 riotId={member.riotId}
                 iconId={member.iconId}
-                ring={member.id === mvpId ? 'gold' : style.ring}
+                ring={member.id === mvpId ? 'gold' : member.id === bagreId ? 'bagre' : style.ring}
                 highlight={member.isYou}
                 badges={
                   <>
                     {member.isCaptain && <CaptainBadge />}
                     {member.id === mvpId && <MvpBadge />}
+                    {member.id === bagreId && <BagreBadge />}
                     {member.isYou && <YouBadge />}
                   </>
                 }

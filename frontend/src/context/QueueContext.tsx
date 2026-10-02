@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, tokenStorage } from '../lib/api'
+import { API_BASE, api, tokenStorage } from '../lib/api'
+import type { QueueMode } from '../lib/modes'
 
 export interface ReadyCheckInfo {
   endsAt: number
@@ -13,7 +14,9 @@ export interface ReadyCheckInfo {
 export interface QueueSnapshot {
   // ready_check = a fila fechou e o jogador precisa aceitar a partida
   status: 'idle' | 'queued' | 'ready_check' | 'matched'
-  size: number
+  mode: QueueMode | null // fila (ou confirmação) em que o jogador está
+  size: number // jogadores na fila do modo do jogador
+  sizes: Record<QueueMode, number> // quantos esperam em cada fila
   required: number
   players: { riotId: string; iconId: number; isYou: boolean }[]
   readyCheck: ReadyCheckInfo | null
@@ -28,7 +31,7 @@ interface QueueContextValue {
   error: string
   notice: string // aviso do servidor (ex.: saiu da fila por não aceitar) até o jogador fechar
   clearNotice: () => void
-  join: () => Promise<void>
+  join: (mode: QueueMode) => Promise<void>
   leave: () => Promise<void>
   accept: () => Promise<void>
   decline: () => Promise<void>
@@ -57,7 +60,7 @@ export function QueueProvider({ children }: { children: ReactNode }) {
     const token = tokenStorage.get()
     if (!token) return
 
-    const source = new EventSource(`/api/queue/events?access_token=${encodeURIComponent(token)}`)
+    const source = new EventSource(`${API_BASE}/queue/events?access_token=${encodeURIComponent(token)}`)
     source.onopen = () => setConnected(true)
     source.onerror = () => setConnected(false)
     source.onmessage = (event) => {
@@ -69,12 +72,12 @@ export function QueueProvider({ children }: { children: ReactNode }) {
   }, [receive])
 
   const run = useCallback(
-    async (path: string) => {
+    async (path: string, body?: unknown) => {
       setBusy(true)
       setError('')
       if (path === '/queue/join') setNotice('')
       try {
-        receive(await api<QueueSnapshot>(path, { method: 'POST' }))
+        receive(await api<QueueSnapshot>(path, { method: 'POST', body }))
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro inesperado.')
       } finally {
@@ -93,7 +96,7 @@ export function QueueProvider({ children }: { children: ReactNode }) {
       error,
       notice,
       clearNotice: () => setNotice(''),
-      join: () => run('/queue/join'),
+      join: (mode) => run('/queue/join', { mode }),
       leave: () => run('/queue/leave'),
       accept: () => run('/queue/accept'),
       decline: () => run('/queue/decline'),

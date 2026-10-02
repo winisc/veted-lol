@@ -1,4 +1,4 @@
-import { CrownIcon, StarIcon } from './icons'
+import { CrownIcon, FishIcon, StarIcon } from './icons'
 
 // Pequenas etiquetas que aparecem junto dos jogadores.
 
@@ -20,6 +20,15 @@ export function MvpBadge() {
     <span className="inline-flex items-center gap-1 rounded bg-gold-200/15 px-1.5 py-0.5 text-[11px] font-semibold text-gold-200">
       <StarIcon className="h-3 w-3" />
       MVP
+    </span>
+  )
+}
+
+export function BagreBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded bg-bagre/15 px-1.5 py-0.5 text-[11px] font-semibold text-bagre">
+      <FishIcon className="h-3 w-3" />
+      Bagre
     </span>
   )
 }

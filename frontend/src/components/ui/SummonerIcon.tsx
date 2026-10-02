@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { iconUrl } from '../../lib/ddragon'
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl'
-export type IconRing = 'gold' | 'blue' | 'red' | 'cyan' | 'dim'
+export type IconRing = 'gold' | 'blue' | 'red' | 'cyan' | 'bagre' | 'dim'
 
 const sizes: Record<IconSize, string> = {
   xs: 'h-7 w-7',
@@ -19,6 +19,7 @@ const rings: Record<IconRing, string> = {
   blue: 'bg-team-blue',
   red: 'bg-team-red',
   cyan: 'bg-hex-300',
+  bagre: 'bg-bagre',
   dim: 'bg-rim',
 }
 

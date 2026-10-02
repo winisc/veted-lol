@@ -1,13 +1,17 @@
+import type { QueueMode } from '../../shared/types/modes'
+
 export type Side = 'blue' | 'red'
 export type MatchOutcome = Side | 'remake'
 export type PlayerResult = 'win' | 'loss' | 'remake'
 
 export interface NewMatch {
   id: string
+  mode: QueueMode
   startedAt: number
   endedAt: number
   outcome: MatchOutcome
   mvpId: number | null
+  bagreId: number | null
   players: { userId: number; side: Side; isCaptain: boolean }[]
 }
 
@@ -17,6 +21,7 @@ export interface PlayerStats {
   wins: number
   losses: number
   mvps: number
+  bagres: number
 }
 
 export interface RankingRow extends PlayerStats {
@@ -34,6 +39,7 @@ export interface HistoryRow {
   result: PlayerResult
   isCaptain: boolean
   isMvp: boolean
+  isBagre: boolean
 }
 
 // ---- Admin ----
@@ -50,11 +56,13 @@ export interface AdminMatchPlayerRow {
 
 export interface AdminMatch {
   id: string
+  mode: QueueMode
   startedAt: string
   endedAt: string
   durationSeconds: number
   outcome: MatchOutcome
   mvpId: number | null
+  bagreId: number | null
   players: {
     userId: number
     riotId: string

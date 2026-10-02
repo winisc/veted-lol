@@ -13,11 +13,14 @@ export function countResultVotes(lobby: Lobby): Record<MatchOutcome, number> {
   return counts
 }
 
-export function countMvpVotes(lobby: Lobby) {
+function countTargets(votes: Map<number, number>) {
   const counts = new Map<number, number>()
-  for (const target of lobby.mvpVotes.values()) counts.set(target, (counts.get(target) ?? 0) + 1)
+  for (const target of votes.values()) counts.set(target, (counts.get(target) ?? 0) + 1)
   return counts
 }
+
+export const countMvpVotes = (lobby: Lobby) => countTargets(lobby.mvpVotes)
+export const countBagreVotes = (lobby: Lobby) => countTargets(lobby.bagreVotes)
 
 export function votesNeeded(lobby: Lobby) {
   return Math.min(lobbyConfig.matchVotesNeeded, lobby.players.length)
@@ -38,6 +41,13 @@ export function mvpCandidates(lobby: Lobby): number[] {
   return lobby.outcome === 'blue' || lobby.outcome === 'red' ? lobby.teams[lobby.outcome] : []
 }
 
+// Jogadores do time perdedor: são os candidatos a bagre.
+export function bagreCandidates(lobby: Lobby): number[] {
+  if (lobby.outcome === 'blue') return lobby.teams.red
+  if (lobby.outcome === 'red') return lobby.teams.blue
+  return []
+}
+
 function teamOf(lobby: Lobby, userId: number): Side | null {
   if (lobby.teams.blue.includes(userId)) return 'blue'
   if (lobby.teams.red.includes(userId)) return 'red'
@@ -55,11 +65,11 @@ function turnPicksLeft(lobby: Lobby) {
 export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
   const counts = countVotes(lobby)
   const captainsRevealed = lobby.phase !== 'voting'
-  const mvpRevealed = lobby.phase === 'finished'
-  const mvpCounts = countMvpVotes(lobby)
+  const votesRevealed = lobby.phase === 'finished'
 
   return {
     id: lobby.id,
+    mode: lobby.mode,
     phase: lobby.phase,
     endsAt: lobby.endsAt,
     durationMs: lobby.durationMs,
@@ -73,6 +83,7 @@ export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
       votes: captainsRevealed ? (counts.get(p.userId) ?? 0) : null,
       isCaptain: lobby.captains.includes(p.userId),
       team: teamOf(lobby, p.userId),
+      rankPosition: lobby.rankPositions.get(p.userId) ?? null,
     })),
     myVote: lobby.votes.get(userId) ?? null,
     votedCount: lobby.votes.size,
@@ -99,8 +110,13 @@ export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
       mvpCandidates: mvpCandidates(lobby),
       mvpVotedCount: lobby.mvpVotes.size,
       myMvpVote: lobby.mvpVotes.get(userId) ?? null,
-      mvpCounts: mvpRevealed ? Object.fromEntries(mvpCounts) : null,
+      mvpCounts: votesRevealed ? Object.fromEntries(countMvpVotes(lobby)) : null,
       mvpId: lobby.mvpId,
+      bagreCandidates: bagreCandidates(lobby),
+      bagreVotedCount: lobby.bagreVotes.size,
+      myBagreVote: lobby.bagreVotes.get(userId) ?? null,
+      bagreCounts: votesRevealed ? Object.fromEntries(countBagreVotes(lobby)) : null,
+      bagreId: lobby.bagreId,
       gameNumber: lobby.gameNumber,
       rematchVotes: lobby.rematchVotes.size,
       iVotedRematch: lobby.rematchVotes.has(userId),

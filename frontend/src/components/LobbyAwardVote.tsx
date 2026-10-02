@@ -1,29 +1,76 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import type { LobbyPlayer, LobbySnapshot, Side } from '../hooks/useLobby'
 import { sideStyle, splitRiotId } from '../lib/teams'
 import PhaseTimer from './PhaseTimer'
 import { CaptainBadge, YouBadge } from './ui/Badges'
 import ConfirmDialog from './ui/ConfirmDialog'
+import { FishIcon, StarIcon } from './ui/icons'
 import PlayerTile from './ui/PlayerTile'
 import SectionTitle from './ui/SectionTitle'
 import SummonerIcon from './ui/SummonerIcon'
+import type { IconRing } from './ui/SummonerIcon'
+
+export type AwardKind = 'mvp' | 'bagre'
+
+// Textos e cores de cada votação. As duas seguem as mesmas regras: voto único, secreto, sem votar em si mesmo.
+const awards: Record<
+  AwardKind,
+  {
+    title: string
+    instructions: string
+    footer: string
+    confirmTitle: string
+    confirmText: string
+    accent: string
+    ring: IconRing
+    icon: ReactNode
+  }
+> = {
+  mvp: {
+    title: 'Quem foi o MVP?',
+    instructions: 'Escolha o melhor jogador do time vencedor (não vale votar em si mesmo).',
+    footer: 'O mais votado vira MVP; empate é sorteado.',
+    confirmTitle: 'Confirmar voto de MVP?',
+    confirmText: 'Esse jogador vai receber o seu voto para MVP.',
+    accent: 'text-gold-200',
+    ring: 'gold',
+    icon: <StarIcon className="h-4 w-4" />,
+  },
+  bagre: {
+    title: 'Quem foi o bagre?',
+    instructions: 'Escolha o pior jogador do time que perdeu (não vale votar em si mesmo).',
+    footer: 'O mais votado vira o bagre da partida e perde pontos na tabela; empate é sorteado.',
+    confirmTitle: 'Confirmar voto de bagre?',
+    confirmText: 'Esse jogador vai receber o seu voto para bagre.',
+    accent: 'text-bagre',
+    ring: 'bagre',
+    icon: <FishIcon className="h-4 w-4" />,
+  },
+}
 
 interface Props {
+  kind: AwardKind
   lobby: LobbySnapshot
   skew: number
   busy: boolean
   onVote: (playerId: number) => void
 }
 
-export default function LobbyMvp({ lobby, skew, busy, onVote }: Props) {
+export default function LobbyAwardVote({ kind, lobby, skew, busy, onVote }: Props) {
+  const award = awards[kind]
   const { match } = lobby
   const winnerSide = match.outcome as Side
-  const style = sideStyle[winnerSide]
-  const candidates = lobby.players.filter((p) => match.mvpCandidates.includes(p.id))
+  // Candidatos: MVP sai do time vencedor; bagre, do perdedor.
+  const side: Side = kind === 'mvp' ? winnerSide : winnerSide === 'blue' ? 'red' : 'blue'
+  const style = sideStyle[side]
+  const candidateIds = kind === 'mvp' ? match.mvpCandidates : match.bagreCandidates
+  const myVote = kind === 'mvp' ? match.myMvpVote : match.myBagreVote
+  const votedCount = kind === 'mvp' ? match.mvpVotedCount : match.bagreVotedCount
+  const candidates = lobby.players.filter((p) => candidateIds.includes(p.id))
 
   // Jogador escolhido aguardando confirmação no modal.
   const [pending, setPending] = useState<LobbyPlayer | null>(null)
-  const voted = match.myMvpVote !== null
+  const voted = myVote !== null
   const closeDialog = useCallback(() => setPending(null), [])
 
   function confirmVote() {
@@ -36,23 +83,30 @@ export default function LobbyMvp({ lobby, skew, busy, onVote }: Props) {
 
   return (
     <div className="space-y-4">
-      <SectionTitle title="Quem foi o MVP?">
-        <span className={`font-semibold ${style.text}`}>Vitória do {style.name}.</span>{' '}
+      <SectionTitle
+        title={
+          <span className="inline-flex items-center gap-2">
+            <span className={award.accent}>{award.icon}</span>
+            {award.title}
+          </span>
+        }
+      >
+        <span className={`font-semibold ${sideStyle[winnerSide].text}`}>Vitória do {sideStyle[winnerSide].name}.</span>{' '}
         {voted
           ? 'Voto registrado. Agora é esperar os outros jogadores.'
-          : 'Escolha o melhor jogador do time vencedor (não vale votar em si mesmo). Você vota uma vez só e os votos ficam secretos até o fim.'}
+          : `${award.instructions} Você vota uma vez só e os votos ficam secretos até o fim.`}
       </SectionTitle>
 
       <PhaseTimer
         endsAt={lobby.endsAt}
         durationMs={lobby.durationMs}
         skew={skew}
-        label={`${match.mvpVotedCount} de ${lobby.players.length} jogadores já votaram`}
+        label={`${votedCount} de ${lobby.players.length} jogadores já votaram`}
       />
 
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {candidates.map((player) => {
-          const selected = match.myMvpVote === player.id
+          const selected = myVote === player.id
           return (
             <li key={player.id}>
               <PlayerTile
@@ -79,11 +133,11 @@ export default function LobbyMvp({ lobby, skew, busy, onVote }: Props) {
         })}
       </ul>
 
-      <p className="text-center text-sm text-ash">O mais votado vira MVP; empate é sorteado.</p>
+      <p className="text-center text-sm text-ash">{award.footer}</p>
 
       <ConfirmDialog
         open={pending !== null}
-        title="Confirmar voto de MVP?"
+        title={award.confirmTitle}
         confirmLabel="Confirmar voto"
         busy={busy}
         onConfirm={confirmVote}
@@ -91,14 +145,13 @@ export default function LobbyMvp({ lobby, skew, busy, onVote }: Props) {
       >
         {pending && (
           <div className="flex flex-col items-center gap-2">
-            <SummonerIcon iconId={pending.iconId} size="xl" ring="gold" />
+            <SummonerIcon iconId={pending.iconId} size="xl" ring={award.ring} />
             <p className="mt-1 font-display text-2xl text-gold-50">
               {pendingName}
               <span className="ml-1 font-sans text-base font-normal text-ash">#{pendingTag}</span>
             </p>
             <p className="text-sm text-ash">
-              Esse jogador vai receber o seu voto para MVP.{' '}
-              <span className="font-semibold text-gold-200">O voto não pode ser alterado.</span>
+              {award.confirmText} <span className="font-semibold text-gold-200">O voto não pode ser alterado.</span>
             </p>
           </div>
         )}

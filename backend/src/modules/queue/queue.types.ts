@@ -1,3 +1,7 @@
+import type { QueueMode } from '../../shared/types/modes'
+
+export type { QueueMode }
+
 // idle -> queued -> ready_check (fila fechou: aceitar/recusar) -> matched (todos aceitaram: está em um lobby)
 export type QueueStatus = 'idle' | 'queued' | 'ready_check' | 'matched'
 
@@ -10,6 +14,7 @@ export interface QueuePlayer {
 // Confirmação de partida: os jogadores da fila que fechou precisam aceitar dentro do prazo.
 export interface ReadyCheck {
   id: string
+  mode: QueueMode
   players: QueuePlayer[]
   accepted: Set<number>
   endsAt: number
@@ -19,7 +24,9 @@ export interface ReadyCheck {
 // O que cada jogador recebe — sem expor ids de outros usuários.
 export interface QueueSnapshot {
   status: QueueStatus
-  size: number
+  mode: QueueMode | null // fila (ou confirmação) em que o jogador está
+  size: number // jogadores esperando na fila do modo do jogador (0 se não está em fila)
+  sizes: Record<QueueMode, number> // quantos esperam em cada fila (para os botões de entrar)
   required: number
   players: { riotId: string; iconId: number; isYou: boolean }[]
   readyCheck: {

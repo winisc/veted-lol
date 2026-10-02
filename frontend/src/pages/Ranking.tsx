@@ -24,14 +24,15 @@ interface RankingEntry {
   losses: number;
   winRate: number | null;
   mvps: number;
+  bagres: number;
 }
 
 interface RankingResponse {
-  scoring: { win: number; loss: number; mvp: number };
+  scoring: { win: number; loss: number; mvp: number; bagre: number };
   ranking: RankingEntry[];
 }
 
-const COLUMNS = 8;
+const COLUMNS = 9;
 
 // Agrupa posições vizinhas da mesma zona (o backend já devolve o ranking em ordem).
 function groupByZone(ranking: RankingEntry[]) {
@@ -169,6 +170,7 @@ export default function Ranking() {
                   <th className="px-3 py-3 text-right">D</th>
                   <th className="px-3 py-3 text-right">Win rate</th>
                   <th className="px-3 py-3 text-right">MVPs</th>
+                  <th className="px-3 py-3 text-right">Bagres</th>
                 </tr>
               </thead>
               <tbody>
@@ -242,6 +244,9 @@ export default function Ranking() {
                             </td>
                             <td className="px-3 py-2.5 text-right font-cond text-base tabular-nums text-gold-200">
                               {entry.mvps}
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-cond text-base tabular-nums text-bagre">
+                              {entry.bagres ?? 0}
                             </td>
                           </tr>
                         );

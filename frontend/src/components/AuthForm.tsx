@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useRiotLookup } from "../hooks/useRiotLookup";
 import { pageSplash } from "../lib/ddragon";
+import { cleanRiotIdInput, normalizeRiotId } from "../lib/riotId";
 import RiotIdPreview from "./RiotIdPreview";
 import HexButton from "./ui/HexButton";
 import { BrandMark } from "./ui/icons";
@@ -52,7 +53,7 @@ export default function AuthForm({
 
     setSubmitting(true);
     try {
-      await onSubmit(riotId.trim(), password);
+      await onSubmit(normalizeRiotId(riotId), password);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado.");
       setSubmitting(false);
@@ -83,7 +84,7 @@ export default function AuthForm({
             </p>
             <p className="mt-4 text-gold-50/70">
               Fila de 10 jogadores, votação de capitães, draft 1-2-2-2-1,
-              votação de MVP e tabela com pontos.
+              votação de MVP e de bagre, e tabela com pontos.
             </p>
           </div>
         </div>
@@ -100,7 +101,7 @@ export default function AuthForm({
               <input
                 className={inputClass}
                 value={riotId}
-                onChange={(e) => setRiotId(e.target.value)}
+                onChange={(e) => setRiotId(cleanRiotIdInput(e.target.value))}
                 placeholder="Nome#BR1"
                 autoComplete="username"
                 required

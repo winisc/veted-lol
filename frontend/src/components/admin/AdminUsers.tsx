@@ -20,6 +20,7 @@ interface AdminUser {
   wins: number
   losses: number
   mvps: number
+  bagres: number
   winRate: number | null
   points: number
 }

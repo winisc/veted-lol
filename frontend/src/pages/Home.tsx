@@ -1,11 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
 import QueuePanel from "../components/QueuePanel";
+import LiveMatches from "../components/LiveMatches";
 import Notice from "../components/ui/Notice";
 import PageHero from "../components/ui/PageHero";
 import Panel from "../components/ui/Panel";
 import PlayerRow from "../components/ui/PlayerRow";
 import SummonerIcon from "../components/ui/SummonerIcon";
-import { StarIcon } from "../components/ui/icons";
+import { FishIcon, StarIcon } from "../components/ui/icons";
 import { useAuth } from "../context/AuthContext";
 import { useApi } from "../hooks/useApi";
 import { pageSplash } from "../lib/ddragon";
@@ -40,7 +41,7 @@ interface ProfileResponse {
     zone: Zone | null;
     rankedPlayers: number;
   };
-  history: { matchId: string; result: Result; isMvp: boolean }[];
+  history: { matchId: string; result: Result; isMvp: boolean; isBagre: boolean }[];
 }
 
 // O caminho de uma partida, na ordem em que acontece.
@@ -54,7 +55,7 @@ const steps = [
   { title: "Partida", text: "Cronômetro rolando; 6 votos encerram o jogo." },
   {
     title: "Resultado",
-    text: "Votação do vencedor e do MVP. Pontos na tabela.",
+    text: "Votação do vencedor, do MVP e do bagre. Pontos na tabela.",
   },
 ];
 
@@ -218,12 +219,15 @@ function RecordBody({
             {form.map((match) => (
               <li
                 key={match.matchId}
-                title={match.isMvp ? "MVP" : undefined}
+                title={match.isMvp ? "MVP" : match.isBagre ? "Bagre" : undefined}
                 className={`relative grid h-8 w-8 place-items-center rounded-md border font-cond text-base font-bold ${formStyle[match.result].classes}`}
               >
                 {formStyle[match.result].label}
                 {match.isMvp && (
                   <StarIcon className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 text-gold-200" />
+                )}
+                {match.isBagre && (
+                  <FishIcon className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 text-bagre" />
                 )}
               </li>
             ))}
@@ -318,6 +322,8 @@ export default function Home() {
           <QueuePanel />
         </div>
       </PageHero>
+
+      <LiveMatches />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
         <MyRecord ranking={ranking} />

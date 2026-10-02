@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Request, Response } from 'express'
 import { AppError } from '../../shared/errors/AppError'
 import { appEvents } from '../../shared/events/appEvents'
+import { QUEUE_MODES, isQueueMode, type QueueMode } from '../../shared/types/modes'
 import { formatRiotId } from '../../shared/utils/riotId'
 import { lobbyRepository } from '../lobby/lobby.repository'
 import { lobbyService } from '../lobby/lobby.service'
@@ -21,7 +22,8 @@ const disconnectTimers = new Map<number, NodeJS.Timeout>()
 const readyCheckTimers = new Map<string, NodeJS.Timeout>()
 
 function snapshot(userId: number, notice?: string): QueueSnapshot {
-  const base = { size: queueRepository.size(), required: REQUIRED, readyCheck: null, notice }
+  const sizes = queueRepository.sizes()
+  const base = { mode: null, size: 0, sizes, required: REQUIRED, readyCheck: null, notice }
 
   if (lobbyRepository.findByUser(userId)) return { ...base, status: 'matched', players: [] }
 
@@ -30,6 +32,7 @@ function snapshot(userId: number, notice?: string): QueueSnapshot {
     return {
       ...base,
       status: 'ready_check',
+      mode: check.mode,
       players: [],
       readyCheck: {
         endsAt: check.endsAt,
@@ -42,12 +45,14 @@ function snapshot(userId: number, notice?: string): QueueSnapshot {
     }
   }
 
-  const queued = queueRepository.isWaiting(userId)
+  const mode = queueRepository.modeOf(userId)
   return {
     ...base,
-    status: queued ? 'queued' : 'idle',
-    players: queued
-      ? queueRepository.list().map((p) => ({ riotId: p.riotId, iconId: p.iconId, isYou: p.userId === userId }))
+    status: mode ? 'queued' : 'idle',
+    mode,
+    size: mode ? sizes[mode] : 0,
+    players: mode
+      ? queueRepository.list(mode).map((p) => ({ riotId: p.riotId, iconId: p.iconId, isYou: p.userId === userId }))
       : [],
   }
 }
@@ -57,11 +62,12 @@ function broadcast() {
 }
 
 // Fila com jogadores suficientes: os primeiros saem da fila e recebem a confirmação de partida.
-function startReadyChecks() {
-  while (queueRepository.size() >= REQUIRED) {
+function startReadyChecks(mode: QueueMode) {
+  while (queueRepository.size(mode) >= REQUIRED) {
     const check: ReadyCheck = {
       id: randomUUID(),
-      players: queueRepository.list().slice(0, REQUIRED),
+      mode,
+      players: queueRepository.list(mode).slice(0, REQUIRED),
       accepted: new Set(),
       endsAt: Date.now() + READY_CHECK_MS,
       durationMs: READY_CHECK_MS,
@@ -87,7 +93,7 @@ function clearReadyCheck(check: ReadyCheck) {
 // Todos aceitaram: vira lobby.
 function completeReadyCheck(check: ReadyCheck) {
   clearReadyCheck(check)
-  lobbyService.create(check.players)
+  lobbyService.create(check.players, check.mode)
   broadcast()
 }
 
@@ -102,8 +108,8 @@ function failReadyCheck(
 
   const removed = new Set(removedIds)
   const returning = check.players.filter((p) => !removed.has(p.userId))
-  queueRepository.addToFront(returning)
-  startReadyChecks()
+  queueRepository.addToFront(check.mode, returning)
+  startReadyChecks(check.mode)
 
   for (const userId of queueEvents.userIds()) {
     let notice: string | undefined
@@ -123,16 +129,22 @@ appEvents.on('lobby:left', (userIds: number[]) => {
 export const queueService = {
   snapshot,
 
-  join(userId: number): QueueSnapshot {
+  // Entra na fila do modo escolhido. Quem já está na outra fila troca de fila.
+  join(userId: number, mode: unknown = 'vote'): QueueSnapshot {
+    if (!isQueueMode(mode)) throw new AppError('Modo de fila inválido.', 400)
     if (lobbyRepository.findByUser(userId)) throw new AppError('Você já está em um lobby.', 409)
-    if (queueRepository.findReadyCheck(userId)) return snapshot(userId)
+    if (queueRepository.findReadyCheck(userId)) {
+      throw new AppError('Você está numa confirmação de partida. Aceite ou recuse antes de trocar de fila.', 409)
+    }
 
-    if (!queueRepository.isWaiting(userId)) {
+    const current = queueRepository.modeOf(userId)
+    if (current !== mode) {
       const user = userRepository.findById(userId)
       if (!user) throw new AppError('Usuário não encontrado.', 401)
 
-      queueRepository.add({ userId, riotId: formatRiotId(user.gameName, user.tagLine), iconId: user.iconId })
-      startReadyChecks()
+      if (current) queueRepository.remove(userId)
+      queueRepository.add(mode, { userId, riotId: formatRiotId(user.gameName, user.tagLine), iconId: user.iconId })
+      startReadyChecks(mode)
       broadcast()
     }
 
@@ -171,9 +183,12 @@ export const queueService = {
   // ---- Admin ----
 
   listForAdmin() {
-    const waiting = queueRepository.list().map((p) => ({ id: p.userId, riotId: p.riotId, iconId: p.iconId }))
+    const waiting = QUEUE_MODES.flatMap((mode) =>
+      queueRepository.list(mode).map((p) => ({ id: p.userId, riotId: p.riotId, iconId: p.iconId, mode })),
+    )
     const checks = queueRepository.allReadyChecks().map((c) => ({
       id: c.id,
+      mode: c.mode,
       endsAt: c.endsAt,
       players: c.players.map((p) => ({ id: p.userId, riotId: p.riotId, iconId: p.iconId, accepted: c.accepted.has(p.userId) })),
     }))
@@ -194,7 +209,7 @@ export const queueService = {
 
   // Esvazia a fila de espera (confirmações em andamento continuam).
   adminClear() {
-    const removed = queueRepository.list().map((p) => p.userId)
+    const removed = QUEUE_MODES.flatMap((mode) => queueRepository.list(mode).map((p) => p.userId))
     for (const userId of removed) queueRepository.remove(userId)
     for (const userId of removed) queueEvents.send(userId, snapshot(userId, 'Um admin esvaziou a fila.'))
     broadcast()

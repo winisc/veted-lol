@@ -30,13 +30,14 @@ export const profileService = {
         losses: stats.losses,
         winRate: winRate(stats.wins, stats.losses),
         mvps: stats.mvps,
+        bagres: stats.bagres,
         rank: entry?.position ?? null, // null enquanto não jogou nenhuma partida válida
         zone: entry?.zone ?? null,
         rankedPlayers: ranking.length,
       },
       history: matchRepository.historyForUser(userId, HISTORY_LIMIT).map((match) => ({
         ...match,
-        points: matchPoints(match.result, match.isMvp),
+        points: matchPoints(match.result, match.isMvp, match.isBagre),
       })),
       scoring,
     }

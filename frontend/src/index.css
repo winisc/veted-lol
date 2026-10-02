@@ -34,6 +34,7 @@
 
   --color-team-blue: #4f8ff0;
   --color-team-red: #e5484d;
+  --color-bagre: #9aa66a; /* bagre: o pior da partida (verde-lodo) */
 }
 
 @layer base {

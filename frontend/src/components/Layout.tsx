@@ -7,6 +7,7 @@ import { BrandMark, LogoutIcon, ShieldIcon, SwordsIcon, TrophyIcon, UserIcon } f
 import SummonerIcon from './ui/SummonerIcon'
 import Notice from './ui/Notice'
 import ReadyCheckModal from './ReadyCheckModal'
+import { queueModes } from '../lib/modes'
 
 interface Tab {
   to: string
@@ -34,7 +35,7 @@ function QueueStatus({ compact }: { compact?: boolean }) {
         className={`flex items-center gap-2 rounded-md border border-hex-300/30 bg-hex-300/10 text-hex-100 ${compact ? 'px-2.5 py-1 text-xs' : 'px-3 py-2.5 text-sm'}`}
       >
         <span className="h-2 w-2 animate-pulse rounded-full bg-hex-300" />
-        <span className="font-semibold">Na fila</span>
+        <span className="font-semibold">Na fila{snapshot.mode && ` · ${queueModes[snapshot.mode].short}`}</span>
         <span className="ml-auto font-cond text-base font-bold tabular-nums">
           {snapshot.size}/{snapshot.required}
         </span>

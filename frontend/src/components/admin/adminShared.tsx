@@ -14,12 +14,13 @@ export const phaseLabel: Record<LobbyPhase, string> = {
   playing: 'Em partida',
   result: 'Votando o vencedor',
   mvp: 'Votando o MVP',
+  bagre: 'Votando o bagre',
   finished: 'Finalizada',
   rematch: 'Revanche',
 }
 
 // Fases em que a partida está rolando (dá para forçar o resultado).
-export const matchPhases: LobbyPhase[] = ['playing', 'result', 'mvp']
+export const matchPhases: LobbyPhase[] = ['playing', 'result', 'mvp', 'bagre']
 
 export const outcomeLabel: Record<MatchOutcome, string> = {
   blue: 'Vitória do Azul',

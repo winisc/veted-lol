@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../lib/api'
-import { isValidRiotIdFormat } from '../lib/riotId'
+import { isValidRiotIdFormat, normalizeRiotId } from '../lib/riotId'
 
 export interface PlayerProfile {
   riotId: string
@@ -24,7 +24,7 @@ export function useRiotLookup(riotId: string, enabled: boolean): RiotLookupState
   const [state, setState] = useState<RiotLookupState>({ status: 'idle' })
 
   useEffect(() => {
-    const value = riotId.trim()
+    const value = normalizeRiotId(riotId)
     if (!enabled || !isValidRiotIdFormat(value)) {
       setState({ status: 'idle' })
       return

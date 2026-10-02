@@ -2,7 +2,7 @@ import Notice from '../components/ui/Notice'
 import Panel from '../components/ui/Panel'
 import ScoringRules from '../components/ui/ScoringRules'
 import SummonerIcon from '../components/ui/SummonerIcon'
-import { CrownIcon, StarIcon } from '../components/ui/icons'
+import { CrownIcon, FishIcon, StarIcon } from '../components/ui/icons'
 import { useApi } from '../hooks/useApi'
 import { profileSplash } from '../lib/ddragon'
 import { formatDate, formatDateTime, formatPercent, signed } from '../lib/format'
@@ -20,6 +20,7 @@ interface ProfileResponse {
     losses: number
     winRate: number | null
     mvps: number
+    bagres: number
     rank: number | null
     zone: Zone | null
     rankedPlayers: number
@@ -32,9 +33,10 @@ interface ProfileResponse {
     result: Result
     isCaptain: boolean
     isMvp: boolean
+    isBagre: boolean
     points: number
   }[]
-  scoring: { win: number; loss: number; mvp: number }
+  scoring: { win: number; loss: number; mvp: number; bagre: number }
 }
 
 // Cores do histórico como no LoL: vitória em ciano, derrota em vermelho.
@@ -124,12 +126,13 @@ export default function Profile() {
       <Panel title="Estatísticas">
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
           <WinRateRing value={stats.winRate} />
-          <div className="grid w-full flex-1 grid-cols-2 gap-x-4 gap-y-5 md:grid-cols-5">
+          <div className="grid w-full flex-1 grid-cols-3 gap-x-4 gap-y-5 md:grid-cols-6">
             <Stat label="Pontos" value={stats.points} tone={pointsTone} />
             <Stat label="Partidas" value={stats.games} />
             <Stat label="Vitórias" value={stats.wins} tone="text-hex-300" />
             <Stat label="Derrotas" value={stats.losses} tone="text-team-red" />
             <Stat label="MVPs" value={stats.mvps} tone="text-gold-200" />
+            <Stat label="Bagres" value={stats.bagres ?? 0} tone="text-bagre" />
           </div>
         </div>
         <ScoringRules scoring={scoring} className="mt-5 border-t border-rim pt-4" />
@@ -164,6 +167,11 @@ export default function Profile() {
                         {match.isMvp && (
                           <span className="flex items-center gap-1 font-semibold text-gold-200">
                             <StarIcon className="h-3.5 w-3.5" /> MVP
+                          </span>
+                        )}
+                        {match.isBagre && (
+                          <span className="flex items-center gap-1 font-semibold text-bagre">
+                            <FishIcon className="h-3.5 w-3.5" /> Bagre
                           </span>
                         )}
                       </p>

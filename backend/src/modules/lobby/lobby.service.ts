@@ -6,6 +6,8 @@ import { lobbyConfig } from './lobby.config'
 import { lobbyEvents } from './lobby.events'
 import { lobbyRepository } from './lobby.repository'
 import {
+  bagreCandidates,
+  countBagreVotes,
   countMvpVotes,
   countResultVotes,
   countVotes,
@@ -16,7 +18,9 @@ import {
   votesNeeded,
 } from './lobby.snapshot'
 import type { Lobby, LobbyEvent, LobbyPhase, LobbyPlayer, LobbySnapshot, MatchOutcome, Side } from './lobby.types'
+import type { QueueMode } from '../../shared/types/modes'
 import { matchRepository } from '../matches/match.repository'
+import { getRanking } from '../ranking/ranking.service'
 
 const timers = new Map<string, NodeJS.Timeout>()
 
@@ -66,6 +70,16 @@ function pickCaptains(lobby: Lobby): number[] {
   const counts = countVotes(lobby)
   return shuffle(lobby.players)
     .sort((a, b) => (counts.get(b.userId) ?? 0) - (counts.get(a.userId) ?? 0))
+    .slice(0, lobbyConfig.captains)
+    .map((p) => p.userId)
+}
+
+// Modo tabela: os mais bem colocados na tabela entre os jogadores do lobby viram capitães.
+// Quem ainda não tem posição (nunca jogou) fica por último; se precisar, as vagas são sorteadas entre eles.
+function pickCaptainsByRanking(lobby: Lobby): number[] {
+  const position = (id: number) => lobby.rankPositions.get(id) ?? Number.POSITIVE_INFINITY
+  return shuffle(lobby.players)
+    .sort((a, b) => position(a.userId) - position(b.userId))
     .slice(0, lobbyConfig.captains)
     .map((p) => p.userId)
 }
@@ -122,7 +136,7 @@ function autoPick(lobby: Lobby) {
   applyPick(lobby, randomItem(draftPool(lobby)).userId)
 }
 
-// ---- Partida: em andamento -> votação do vencedor -> MVP -> salva no histórico ----
+// ---- Partida: em andamento -> votação do vencedor -> MVP -> bagre -> salva no histórico ----
 
 function startPlaying(lobby: Lobby) {
   lobby.startedAt = Date.now()
@@ -131,21 +145,25 @@ function startPlaying(lobby: Lobby) {
 
 function settleResult(lobby: Lobby, outcome: MatchOutcome) {
   lobby.outcome = outcome
-  // Remake não tem vencedor nem MVP.
+  // Remake não tem vencedor, MVP nem bagre.
   if (outcome === 'remake') finishMatch(lobby)
   else setPhase(lobby, 'mvp', lobbyConfig.mvpMs, () => finishMvp(lobby))
 }
 
-// O mais votado é o MVP; empate é sorteado; sem nenhum voto, ninguém é MVP.
-function pickMvp(lobby: Lobby): number | null {
-  const counts = countMvpVotes(lobby)
+// O mais votado leva (MVP ou bagre); empate é sorteado; sem nenhum voto, ninguém leva.
+function mostVoted(counts: Map<number, number>): number | null {
   if (counts.size === 0) return null
   const top = Math.max(...counts.values())
   return randomItem([...counts].filter(([, n]) => n === top).map(([id]) => id))
 }
 
 function finishMvp(lobby: Lobby) {
-  lobby.mvpId = pickMvp(lobby)
+  lobby.mvpId = mostVoted(countMvpVotes(lobby))
+  setPhase(lobby, 'bagre', lobbyConfig.bagreMs, () => finishBagre(lobby))
+}
+
+function finishBagre(lobby: Lobby) {
+  lobby.bagreId = mostVoted(countBagreVotes(lobby))
   finishMatch(lobby)
 }
 
@@ -162,19 +180,53 @@ function startRematch(lobby: Lobby) {
   lobby.outcome = null
   lobby.mvpVotes = new Map()
   lobby.mvpId = null
+  lobby.bagreVotes = new Map()
+  lobby.bagreId = null
   lobby.rematchVotes = new Set()
 
   startPlaying(lobby)
+}
+
+// Jogadores de um lado, no formato usado pelas listas ao vivo (tela inicial e admin).
+function teamSummary(lobby: Lobby, side: Side) {
+  return lobby.teams[side].map((id) => {
+    const p = lobby.players.find((x) => x.userId === id)!
+    return { id, riotId: p.riotId, iconId: p.iconId, isCaptain: lobby.captains.includes(id) }
+  })
+}
+
+// Resumo das partidas que acabaram de terminar (vencedor, MVP, bagre). Fica na lista ao vivo
+// por alguns segundos depois do fim. Só em memória: some ao reiniciar o servidor.
+const RECENT_RESULT_MS = 15_000
+const recentResults: {
+  matchId: string
+  mode: QueueMode
+  gameNumber: number
+  outcome: MatchOutcome
+  startedAt: number | null
+  endedAt: number
+  finishedAt: number
+  mvpId: number | null
+  bagreId: number | null
+  teams: Record<Side, ReturnType<typeof teamSummary>>
+}[] = []
+
+function recentResultsList() {
+  const cutoff = Date.now() - RECENT_RESULT_MS
+  while (recentResults.length > 0 && recentResults[recentResults.length - 1].finishedAt < cutoff) recentResults.pop()
+  return recentResults.map((r) => ({ ...r, expiresAt: r.finishedAt + RECENT_RESULT_MS }))
 }
 
 function finishMatch(lobby: Lobby) {
   try {
     matchRepository.save({
       id: lobby.matchId,
+      mode: lobby.mode,
       startedAt: lobby.startedAt ?? lobby.createdAt,
       endedAt: lobby.endedAt ?? Date.now(),
       outcome: lobby.outcome!,
       mvpId: lobby.mvpId,
+      bagreId: lobby.bagreId,
       players: lobby.players.map((p) => ({
         userId: p.userId,
         side: lobby.teams.blue.includes(p.userId) ? 'blue' : 'red',
@@ -185,6 +237,18 @@ function finishMatch(lobby: Lobby) {
     // Não trava os jogadores se o banco falhar; o resultado ainda aparece na tela.
     console.error('Falha ao salvar a partida no histórico:', err)
   }
+  recentResults.unshift({
+    matchId: lobby.matchId,
+    mode: lobby.mode,
+    gameNumber: lobby.gameNumber,
+    outcome: lobby.outcome!,
+    startedAt: lobby.startedAt,
+    endedAt: lobby.endedAt ?? Date.now(),
+    finishedAt: Date.now(),
+    mvpId: lobby.mvpId,
+    bagreId: lobby.bagreId,
+    teams: { blue: teamSummary(lobby, 'blue'), red: teamSummary(lobby, 'red') },
+  })
   setPhase(lobby, 'finished', null)
 }
 
@@ -199,6 +263,11 @@ function cancelLobby(lobby: Lobby, notice: string, causedBy?: number) {
   appEvents.emit('lobby:left', lobby.players.map((p) => p.userId))
 }
 
+// Da partida começar até o histórico ser salvo: ninguém sai e o admin pode forçar o resultado.
+function inMatch(lobby: Lobby) {
+  return lobby.phase === 'playing' || lobby.phase === 'result' || lobby.phase === 'mvp' || lobby.phase === 'bagre'
+}
+
 function requireLobby(userId: number): Lobby {
   const lobby = lobbyRepository.findByUser(userId)
   if (!lobby) throw new AppError('Você não está em um lobby.', 404)
@@ -206,9 +275,17 @@ function requireLobby(userId: number): Lobby {
 }
 
 export const lobbyService = {
-  create(players: LobbyPlayer[]): Lobby {
+  create(players: LobbyPlayer[], mode: QueueMode = 'vote'): Lobby {
+    // Posição de cada um na tabela agora (mostrada na tela e usada no modo tabela).
+    const ranking = getRanking()
+    const rankPositions = new Map(
+      players.map((p) => [p.userId, ranking.find((e) => e.userId === p.userId)?.position ?? null] as const),
+    )
+
     const lobby: Lobby = {
       id: randomUUID(),
+      mode,
+      rankPositions,
       players,
       phase: 'voting',
       votes: new Map(),
@@ -229,6 +306,8 @@ export const lobbyService = {
       outcome: null,
       mvpVotes: new Map(),
       mvpId: null,
+      bagreVotes: new Map(),
+      bagreId: null,
       matchId: randomUUID(),
       gameNumber: 1,
       rematchVotes: new Set(),
@@ -236,7 +315,14 @@ export const lobbyService = {
       createdAt: Date.now(),
     }
     lobbyRepository.create(lobby)
-    setPhase(lobby, 'voting', lobbyConfig.voteMs, () => finishVoting(lobby))
+
+    if (mode === 'ranked') {
+      // Sem votação: capitães pela tabela e já mostra o resultado antes do sorteio.
+      lobby.captains = pickCaptainsByRanking(lobby)
+      setPhase(lobby, 'captains', lobbyConfig.revealMs, () => startCoinflip(lobby))
+    } else {
+      setPhase(lobby, 'voting', lobbyConfig.voteMs, () => finishVoting(lobby))
+    }
     return lobby
   },
 
@@ -332,6 +418,22 @@ export const lobbyService = {
     return snapshotFor(lobby, userId)
   },
 
+  // Voto do bagre (o pior da partida) entre os jogadores do time perdedor. Mesmas regras do MVP.
+  voteBagre(userId: number, targetId: unknown): LobbySnapshot {
+    const lobby = requireLobby(userId)
+    if (lobby.phase !== 'bagre') throw new AppError('Não é o momento de votar no bagre.', 409)
+    if (lobby.bagreVotes.has(userId)) throw new AppError('Você já votou. O voto não pode ser alterado.', 409)
+    if (typeof targetId !== 'number' || !bagreCandidates(lobby).includes(targetId)) {
+      throw new AppError('Esse jogador não é do time perdedor.', 400)
+    }
+    if (targetId === userId) throw new AppError('Você não pode votar em si mesmo.', 400)
+
+    lobby.bagreVotes.set(userId, targetId)
+    if (lobby.bagreVotes.size === lobby.players.length) finishBagre(lobby)
+    else broadcast(lobby)
+    return snapshotFor(lobby, userId)
+  },
+
   // Voto para jogar novamente (pode ser desfeito). Com votos suficientes, começa a revanche com os lados trocados.
   voteRematch(userId: number, vote: unknown): LobbySnapshot {
     const lobby = requireLobby(userId)
@@ -372,7 +474,7 @@ export const lobbyService = {
       }
       return
     }
-    if (lobby.phase === 'playing' || lobby.phase === 'result' || lobby.phase === 'mvp') {
+    if (inMatch(lobby)) {
       throw new AppError('A partida está em andamento. Termine-a para sair.', 409)
     }
 
@@ -380,11 +482,32 @@ export const lobbyService = {
     cancelLobby(lobby, `${leaver?.riotId} saiu e o lobby foi cancelado.`, userId)
   },
 
+  // Partidas em andamento, para qualquer jogador logado acompanhar da tela inicial (só leitura).
+  // Junto vão as que acabaram de terminar, com o resumo final, por alguns segundos.
+  listLive() {
+    const matches = lobbyRepository
+      .all()
+      .filter(inMatch)
+      .map((lobby) => ({
+        id: lobby.id,
+        mode: lobby.mode,
+        phase: lobby.phase,
+        gameNumber: lobby.gameNumber,
+        startedAt: lobby.startedAt,
+        endedAt: lobby.endedAt,
+        teams: { blue: teamSummary(lobby, 'blue'), red: teamSummary(lobby, 'red') },
+      }))
+    return { matches, recent: recentResultsList() }
+  },
+
+  recentResults: recentResultsList,
+
   // ---- Admin ----
 
   listForAdmin() {
     return lobbyRepository.all().map((lobby) => ({
       id: lobby.id,
+      mode: lobby.mode,
       phase: lobby.phase,
       gameNumber: lobby.gameNumber,
       createdAt: lobby.createdAt,
@@ -408,18 +531,19 @@ export const lobbyService = {
     cancelLobby(lobby, 'Um admin cancelou o lobby.')
   },
 
-  // Encerra a partida em andamento com o resultado escolhido (sem MVP) e salva no histórico.
+  // Encerra a partida em andamento com o resultado escolhido (sem MVP nem bagre) e salva no histórico.
   adminForceResult(lobbyId: string, outcome: unknown) {
     const lobby = lobbyRepository.findById(lobbyId)
     if (!lobby) throw new AppError('Lobby não encontrado.', 404)
     if (outcome !== 'blue' && outcome !== 'red' && outcome !== 'remake') throw new AppError('Resultado inválido.', 400)
-    if (lobby.phase !== 'playing' && lobby.phase !== 'result' && lobby.phase !== 'mvp') {
+    if (!inMatch(lobby)) {
       throw new AppError('Só dá para forçar o resultado de uma partida em andamento.', 409)
     }
 
     lobby.endedAt = lobby.endedAt ?? Date.now()
     lobby.outcome = outcome
     lobby.mvpId = null
+    lobby.bagreId = null
     finishMatch(lobby)
   },
 
