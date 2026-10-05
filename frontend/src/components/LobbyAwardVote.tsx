@@ -12,7 +12,7 @@ import type { IconRing } from './ui/SummonerIcon'
 
 export type AwardKind = 'mvp' | 'bagre'
 
-// Textos e cores de cada votação. As duas seguem as mesmas regras: voto único, secreto, sem votar em si mesmo.
+// Textos e cores de cada votação. As duas têm voto único e secreto; só no bagre dá para votar em si mesmo.
 const awards: Record<
   AwardKind,
   {
@@ -22,6 +22,7 @@ const awards: Record<
     confirmTitle: string
     confirmText: string
     accent: string
+    selfVote: boolean // pode votar em si mesmo
     ring: IconRing
     icon: ReactNode
   }
@@ -33,16 +34,18 @@ const awards: Record<
     confirmTitle: 'Confirmar voto de MVP?',
     confirmText: 'Esse jogador vai receber o seu voto para MVP.',
     accent: 'text-gold-200',
+    selfVote: false,
     ring: 'gold',
     icon: <StarIcon className="h-4 w-4" />,
   },
   bagre: {
     title: 'Quem foi o bagre?',
-    instructions: 'Escolha o pior jogador do time que perdeu (não vale votar em si mesmo).',
+    instructions: 'Escolha o pior jogador do time que perdeu (vale votar em si mesmo).',
     footer: 'O mais votado vira o bagre da partida e perde pontos na tabela; empate é sorteado.',
     confirmTitle: 'Confirmar voto de bagre?',
     confirmText: 'Esse jogador vai receber o seu voto para bagre.',
     accent: 'text-bagre',
+    selfVote: true,
     ring: 'bagre',
     icon: <FishIcon className="h-4 w-4" />,
   },
@@ -107,6 +110,7 @@ export default function LobbyAwardVote({ kind, lobby, skew, busy, onVote }: Prop
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {candidates.map((player) => {
           const selected = myVote === player.id
+          const blocked = player.isYou && !award.selfVote
           return (
             <li key={player.id}>
               <PlayerTile
@@ -115,8 +119,8 @@ export default function LobbyAwardVote({ kind, lobby, skew, busy, onVote }: Prop
                 ring={style.ring}
                 selected={selected}
                 // Depois de votar (ou no próprio cartão), fica só leitura; o escolhido continua destacado.
-                dimmed={player.isYou || (voted && !selected)}
-                onClick={voted || player.isYou ? undefined : () => setPending(player)}
+                dimmed={blocked || (voted && !selected)}
+                onClick={voted || blocked ? undefined : () => setPending(player)}
                 disabled={busy}
                 footer={
                   (player.isYou || player.isCaptain || selected) && (
@@ -151,7 +155,7 @@ export default function LobbyAwardVote({ kind, lobby, skew, busy, onVote }: Prop
               <span className="ml-1 font-sans text-base font-normal text-ash">#{pendingTag}</span>
             </p>
             <p className="text-sm text-ash">
-              {award.confirmText} <span className="font-semibold text-gold-200">O voto não pode ser alterado.</span>
+              {pending.isYou ? 'Você vai votar em si mesmo.' : award.confirmText} <span className="font-semibold text-gold-200">O voto não pode ser alterado.</span>
             </p>
           </div>
         )}

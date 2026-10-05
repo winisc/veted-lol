@@ -6,7 +6,10 @@ import { splitRiotId } from '../lib/teams'
 import { BrandMark, LogoutIcon, ShieldIcon, SwordsIcon, TrophyIcon, UserIcon } from './ui/icons'
 import SummonerIcon from './ui/SummonerIcon'
 import Notice from './ui/Notice'
+import DroppedToast from './DroppedToast'
 import ReadyCheckModal from './ReadyCheckModal'
+import SettingsModal from './SettingsModal'
+import RolesRequiredModal from './RolesRequiredModal'
 import { queueModes } from '../lib/modes'
 
 interface Tab {
@@ -130,6 +133,7 @@ function LayoutContent() {
               <p className="truncate font-semibold text-gold-50">{name}</p>
               <p className="truncate text-xs text-ash">#{tag}</p>
             </div>
+            <SettingsModal />
             <button
               type="button"
               onClick={logout}
@@ -153,6 +157,7 @@ function LayoutContent() {
         </Link>
         <div className="ml-auto flex items-center gap-2">
           <QueueStatus compact />
+          <SettingsModal />
           {user && <SummonerIcon iconId={user.iconId} size="xs" ring="gold" />}
           <button type="button" onClick={logout} aria-label="Sair da conta" className="p-1.5 text-ash hover:text-team-red">
             <LogoutIcon />
@@ -182,6 +187,8 @@ function LayoutContent() {
       </main>
 
       <ReadyCheckModal />
+      <DroppedToast />
+      <RolesRequiredModal />
 
       {/* Abas (celular) */}
       <nav

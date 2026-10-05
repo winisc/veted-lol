@@ -8,6 +8,23 @@ const readyChecks = new Map<string, ReadyCheck>()
 const readyCheckByUser = new Map<number, string>()
 
 export const queueRepository = {
+  // Estado inteiro para guardar no banco (ver database/runtimeState.ts).
+  dump() {
+    return {
+      waiting: { vote: [...waiting.vote.values()], ranked: [...waiting.ranked.values()] },
+      readyChecks: [...readyChecks.values()],
+    }
+  },
+
+  // Recoloca o estado guardado (ao iniciar o servidor).
+  restore(saved: { waiting: Record<QueueMode, QueuePlayer[]>; readyChecks: ReadyCheck[] }) {
+    for (const mode of QUEUE_MODES) waiting[mode] = new Map((saved.waiting[mode] ?? []).map((p) => [p.userId, p] as const))
+    for (const check of saved.readyChecks) {
+      readyChecks.set(check.id, check)
+      for (const player of check.players) readyCheckByUser.set(player.userId, check.id)
+    }
+  },
+
   // Em qual fila o jogador está esperando (null se em nenhuma).
   modeOf(userId: number): QueueMode | null {
     return QUEUE_MODES.find((mode) => waiting[mode].has(userId)) ?? null

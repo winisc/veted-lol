@@ -2,6 +2,7 @@ import type { LobbyPlayer, Side } from '../hooks/useLobby'
 import { sideStyle } from '../lib/teams'
 import { BagreBadge, CaptainBadge, MvpBadge, YouBadge } from './ui/Badges'
 import PlayerRow from './ui/PlayerRow'
+import RoleIcons from './ui/RoleIcons'
 
 interface Props {
   side: Side
@@ -35,6 +36,7 @@ export default function TeamCard({ side, members, slots, mvpId, bagreId, winner,
                 iconId={member.iconId}
                 ring={member.id === mvpId ? 'gold' : member.id === bagreId ? 'bagre' : style.ring}
                 highlight={member.isYou}
+                right={<RoleIcons roles={member.roles} />}
                 badges={
                   <>
                     {member.isCaptain && <CaptainBadge />}

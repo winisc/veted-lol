@@ -84,6 +84,7 @@ export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
       isCaptain: lobby.captains.includes(p.userId),
       team: teamOf(lobby, p.userId),
       rankPosition: lobby.rankPositions.get(p.userId) ?? null,
+      roles: lobby.roles.get(p.userId) ?? { main: null, secondary: null, worst: null },
     })),
     myVote: lobby.votes.get(userId) ?? null,
     votedCount: lobby.votes.size,

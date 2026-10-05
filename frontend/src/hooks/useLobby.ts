@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { PlayerRoles } from '../lib/roles'
 import { API_BASE, api, tokenStorage } from '../lib/api'
 import type { QueueMode } from '../lib/modes'
 
@@ -28,6 +29,7 @@ export interface LobbyPlayer {
   isCaptain: boolean
   team: Side | null
   rankPosition: number | null // posição na tabela quando o lobby abriu (null = sem partidas)
+  roles?: PlayerRoles // roles do perfil (ausente em servidores antigos)
 }
 
 export interface Pick {

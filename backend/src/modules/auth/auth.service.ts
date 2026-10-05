@@ -57,6 +57,21 @@ export const authService = {
     return { token: signToken(user.id), user: toPublicUser(user) }
   },
 
+  // Troca a senha de quem está logado, pedindo a senha atual.
+  async changePassword(userId: number, currentPassword: unknown, newPassword: unknown) {
+    const user = userRepository.findById(userId)
+    if (!user) throw new AppError('Usuário não encontrado.', 401)
+    if (typeof currentPassword !== 'string' || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw new AppError('A senha atual está incorreta.', 400)
+    }
+    if (typeof newPassword !== 'string' || newPassword.length < 6) {
+      throw new AppError('A nova senha precisa ter no mínimo 6 caracteres.', 400)
+    }
+    if (newPassword === currentPassword) throw new AppError('A nova senha precisa ser diferente da atual.', 400)
+
+    userRepository.setPassword(userId, await bcrypt.hash(newPassword, 10))
+  },
+
   me(userId: number): PublicUser {
     const user = userRepository.findById(userId)
     if (!user) throw new AppError('Usuário não encontrado.', 401)

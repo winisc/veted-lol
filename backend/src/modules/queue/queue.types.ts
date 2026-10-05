@@ -21,6 +21,9 @@ export interface ReadyCheck {
   durationMs: number
 }
 
+// Por que alguém ficou de fora de uma confirmação de partida.
+export type DropReason = 'timeout' | 'declined' | 'removed'
+
 // O que cada jogador recebe — sem expor ids de outros usuários.
 export interface QueueSnapshot {
   status: QueueStatus
@@ -38,4 +41,6 @@ export interface QueueSnapshot {
     iAccepted: boolean
   } | null
   notice?: string // aviso pontual (ex.: "você não aceitou a partida e saiu da fila")
+  // Só para quem aceitou e voltou para a fila: quem ficou de fora da confirmação e por quê.
+  dropped?: { riotId: string; iconId: number; reason: DropReason }[]
 }

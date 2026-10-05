@@ -4,6 +4,7 @@ import PhaseTimer from './PhaseTimer'
 import TeamCard from './TeamCard'
 import { YouBadge } from './ui/Badges'
 import PlayerRow from './ui/PlayerRow'
+import RoleIcons from './ui/RoleIcons'
 import SummonerIcon from './ui/SummonerIcon'
 
 interface Props {
@@ -100,6 +101,7 @@ export default function LobbyDraft({ lobby, skew, busy, onPick }: Props) {
                       disabled={busy}
                       highlight={player.isYou}
                       badges={player.isYou && <YouBadge />}
+                      right={<RoleIcons roles={player.roles} />}
                     />
                   </li>
                 ))}

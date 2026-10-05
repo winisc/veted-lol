@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { API_BASE, api, tokenStorage } from '../lib/api'
+import { API_BASE, ApiError, api, tokenStorage } from '../lib/api'
+import { askPermissionOnJoin } from '../lib/notify'
 import type { QueueMode } from '../lib/modes'
 
 export interface ReadyCheckInfo {
@@ -9,6 +10,13 @@ export interface ReadyCheckInfo {
   accepted: number
   total: number
   iAccepted: boolean
+}
+
+// Quem ficou de fora de uma confirmação de partida.
+export interface DroppedPlayer {
+  riotId: string
+  iconId: number
+  reason: 'timeout' | 'declined' | 'removed'
 }
 
 export interface QueueSnapshot {
@@ -21,6 +29,7 @@ export interface QueueSnapshot {
   players: { riotId: string; iconId: number; isYou: boolean }[]
   readyCheck: ReadyCheckInfo | null
   notice?: string
+  dropped?: DroppedPlayer[]
 }
 
 interface QueueContextValue {
@@ -31,6 +40,10 @@ interface QueueContextValue {
   error: string
   notice: string // aviso do servidor (ex.: saiu da fila por não aceitar) até o jogador fechar
   clearNotice: () => void
+  dropped: DroppedPlayer[] | null // quem não aceitou a última confirmação (mostrado como aviso rápido)
+  clearDropped: () => void
+  rolesRequired: boolean // tentou entrar na fila sem as roles salvas no perfil
+  dismissRolesRequired: () => void
   join: (mode: QueueMode) => Promise<void>
   leave: () => Promise<void>
   accept: () => Promise<void>
@@ -48,11 +61,14 @@ export function QueueProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [dropped, setDropped] = useState<DroppedPlayer[] | null>(null)
+  const [rolesRequired, setRolesRequired] = useState(false)
 
   const receive = useCallback((data: QueueSnapshot) => {
     setSnapshot(data)
     if (data.readyCheck) setSkew(data.readyCheck.now - Date.now())
-    if (data.notice) setNotice(data.notice)
+    if (data.dropped?.length) setDropped(data.dropped)
+    else if (data.notice) setNotice(data.notice) // com a lista de quem saiu, o aviso rápido já diz tudo
   }, [])
 
   // O servidor envia o estado da fila a cada mudança (SSE). O EventSource reconecta sozinho.
@@ -79,7 +95,8 @@ export function QueueProvider({ children }: { children: ReactNode }) {
       try {
         receive(await api<QueueSnapshot>(path, { method: 'POST', body }))
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro inesperado.')
+        if (err instanceof ApiError && err.code === 'ROLES_REQUIRED') setRolesRequired(true)
+        else setError(err instanceof Error ? err.message : 'Erro inesperado.')
       } finally {
         setBusy(false)
       }
@@ -96,12 +113,19 @@ export function QueueProvider({ children }: { children: ReactNode }) {
       error,
       notice,
       clearNotice: () => setNotice(''),
-      join: (mode) => run('/queue/join', { mode }),
+      dropped,
+      clearDropped: () => setDropped(null),
+      rolesRequired,
+      dismissRolesRequired: () => setRolesRequired(false),
+      join: (mode) => {
+        askPermissionOnJoin() // precisa de um clique: este é o momento certo de pedir
+        return run('/queue/join', { mode })
+      },
       leave: () => run('/queue/leave'),
       accept: () => run('/queue/accept'),
       decline: () => run('/queue/decline'),
     }),
-    [snapshot, skew, connected, busy, error, notice, run],
+    [snapshot, skew, connected, busy, error, notice, dropped, rolesRequired, run],
   )
 
   return <QueueContext.Provider value={value}>{children}</QueueContext.Provider>

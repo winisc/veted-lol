@@ -60,6 +60,7 @@ export const adminService = {
         isAdmin: user.isAdmin,
         adminFromEnv: userRepository.isEnvAdmin(user),
         createdAt: user.createdAt,
+        roles: user.roles,
         games: stats.games,
         wins: stats.wins,
         losses: stats.losses,

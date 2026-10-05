@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import type { MatchOutcome, Side } from '../hooks/useLobby'
 import { queueModes, type QueueMode } from '../lib/modes'
 import { formatDuration, sideStyle, splitRiotId } from '../lib/teams'
+import { Link } from 'react-router-dom'
 import { CrownIcon, FishIcon, StarIcon } from './ui/icons'
+import PlayerLink from './ui/PlayerLink'
 import SummonerIcon from './ui/SummonerIcon'
 
 export interface RecentResult {
@@ -49,6 +51,9 @@ export default function MatchResultCard({ result, now }: { result: RecentResult;
           </span>
           {result.gameNumber > 1 && <span className="text-xs text-ash">Partida {result.gameNumber}</span>}
           <span className="ml-auto font-cond text-base font-semibold tabular-nums text-ash">{formatDuration(duration)}</span>
+          <Link to={`/partida/${result.matchId}`} className="text-xs font-semibold text-gold-200 hover:text-gold-50">
+            Ver partida
+          </Link>
         </div>
 
         <p
@@ -76,7 +81,9 @@ export default function MatchResultCard({ result, now }: { result: RecentResult;
                         {icon} {label}
                       </p>
                       <p className="flex items-center gap-1 truncate text-sm font-semibold text-gold-50">
-                        {splitRiotId(player.riotId)[0]}
+                        <PlayerLink userId={player.id} className="truncate">
+                          {splitRiotId(player.riotId)[0]}
+                        </PlayerLink>
                         {player.isCaptain && <CrownIcon className="h-3 w-3 shrink-0 text-gold-200" />}
                       </p>
                     </div>

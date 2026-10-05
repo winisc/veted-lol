@@ -5,6 +5,12 @@ const lobbies = new Map<string, Lobby>()
 const lobbyByUser = new Map<number, string>()
 
 export const lobbyRepository = {
+  // Recoloca um lobby guardado (ao iniciar o servidor). Quem já tinha saído não volta a ele.
+  restore(lobby: Lobby) {
+    lobbies.set(lobby.id, lobby)
+    for (const player of lobby.players) if (!lobby.left.has(player.userId)) lobbyByUser.set(player.userId, lobby.id)
+  },
+
   create(lobby: Lobby) {
     lobbies.set(lobby.id, lobby)
     for (const player of lobby.players) lobbyByUser.set(player.userId, lobby.id)

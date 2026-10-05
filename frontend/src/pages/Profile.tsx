@@ -1,18 +1,23 @@
+import ProfileRoles from '../components/ProfileRoles'
 import Notice from '../components/ui/Notice'
 import Panel from '../components/ui/Panel'
 import ScoringRules from '../components/ui/ScoringRules'
 import SummonerIcon from '../components/ui/SummonerIcon'
 import { CrownIcon, FishIcon, StarIcon } from '../components/ui/icons'
+import { Navigate, useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
+import ProfileExtra, { type ProfileExtraData } from '../components/ProfileExtra'
+import { useAuth } from '../context/AuthContext'
 import { useApi } from '../hooks/useApi'
 import { profileSplash } from '../lib/ddragon'
 import { formatDate, formatDateTime, formatPercent, signed } from '../lib/format'
 import { formatDuration, splitRiotId } from '../lib/teams'
+import type { PlayerRoles } from '../lib/roles'
 import { zones, type Zone } from '../lib/zones'
 
 type Result = 'win' | 'loss' | 'remake'
 
 interface ProfileResponse {
-  user: { id: number; riotId: string; iconId: number; createdAt: string }
+  user: { id: number; riotId: string; iconId: number; createdAt: string; roles?: PlayerRoles }
   stats: {
     points: number
     games: number
@@ -37,6 +42,7 @@ interface ProfileResponse {
     points: number
   }[]
   scoring: { win: number; loss: number; mvp: number; bagre: number }
+  extra?: ProfileExtraData // ausente em servidores antigos
 }
 
 // Cores do histórico como no LoL: vitória em ciano, derrota em vermelho.
@@ -84,18 +90,34 @@ function Stat({ label, value, tone = 'text-gold-50' }: { label: string; value: s
 }
 
 export default function Profile() {
-  const { data, error, loading } = useApi<ProfileResponse>('/profile')
+  // /perfil é o meu; /jogador/:id é o de outra pessoa (somente leitura).
+  const { id } = useParams()
+  const { user: me } = useAuth()
+  const navigate = useNavigate()
+  const viewingOther = id !== undefined && Number(id) !== me?.id
+  const { data, error, loading } = useApi<ProfileResponse>(viewingOther ? `/profile/${id}` : '/profile')
+  // Veio do aviso da fila (?tour=roles): destaca onde definir as roles até o jogador salvar.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rolesTour = searchParams.get('tour') === 'roles'
+  const endTour = () => setSearchParams({}, { replace: true })
 
+  if (id !== undefined && !viewingOther) return <Navigate to="/perfil" replace />
   if (loading) return <p className="text-ash">Carregando perfil...</p>
   if (error || !data) return <Notice>{error || 'Não foi possível carregar o perfil.'}</Notice>
 
-  const { user, stats, history, scoring } = data
+  const { user, stats, history, scoring, extra } = data
   const [name, tag] = splitRiotId(user.riotId)
   const zone = stats.zone ? zones[stats.zone] : null
   const pointsTone = stats.points < 0 ? 'text-team-red' : 'text-gold-200'
 
   return (
     <div className="space-y-6">
+      {viewingOther && (
+        <button type="button" onClick={() => navigate(-1)} className="-mb-3 text-sm text-ash transition-colors hover:text-gold-50">
+          ← Voltar
+        </button>
+      )}
+
       {/* Banner com splash art e o ícone de invocador em destaque */}
       <section className="relative isolate overflow-hidden rounded-xl border border-rim bg-abyss">
         <img src={profileSplash(user.id)} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover object-[center_20%] opacity-60" />
@@ -106,6 +128,7 @@ export default function Profile() {
             <h1 className="truncate font-display text-4xl text-gold-50 sm:text-5xl">{name}</h1>
             <p className="text-lg text-ash">#{tag}</p>
             <p className="mt-1 text-sm text-ash">Jogando desde {formatDate(user.createdAt)}</p>
+            <ProfileRoles key={user.id} initial={user.roles} tour={rolesTour && !viewingOther} onSaved={endTour} readOnly={viewingOther} />
           </div>
           <div className="flex flex-col items-center gap-2 sm:items-end">
             {stats.rank && zone ? (
@@ -138,15 +161,24 @@ export default function Profile() {
         <ScoringRules scoring={scoring} className="mt-5 border-t border-rim pt-4" />
       </Panel>
 
-      <Panel title="Histórico de partidas" bodyClassName="p-3">
+      {extra && <ProfileExtra extra={extra} />}
+
+      <Panel title={viewingOther ? 'Partidas recentes' : 'Histórico de partidas'} bodyClassName="p-3">
         {history.length === 0 ? (
-          <p className="p-4 text-center text-ash">Nenhuma partida ainda. Entre na fila pela aba Jogar.</p>
+          <p className="p-4 text-center text-ash">
+            {viewingOther ? 'Esse jogador ainda não jogou nenhuma partida.' : 'Nenhuma partida ainda. Entre na fila pela aba Jogar.'}
+          </p>
         ) : (
           <ul className="space-y-1.5">
             {history.map((match) => {
               const style = resultStyle[match.result]
               return (
-                <li key={match.matchId} className="flex items-stretch overflow-hidden rounded-md bg-panel">
+                <li key={match.matchId}>
+                  <Link
+                    to={`/partida/${match.matchId}`}
+                    title="Ver a partida"
+                    className="flex items-stretch overflow-hidden rounded-md bg-panel transition-colors hover:bg-rim"
+                  >
                   <span className={`w-1 shrink-0 ${style.bar}`} aria-hidden="true" />
                   <div className="flex flex-1 flex-wrap items-center gap-x-5 gap-y-1 px-4 py-3">
                     <div className="w-24">
@@ -179,6 +211,7 @@ export default function Profile() {
                     </div>
                     <span className={`font-cond text-2xl font-bold tabular-nums ${style.text}`}>{signed(match.points)}</span>
                   </div>
+                  </Link>
                 </li>
               )
             })}

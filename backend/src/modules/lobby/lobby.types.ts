@@ -1,4 +1,5 @@
 import type { QueueMode } from '../../shared/types/modes'
+import type { PlayerRoles } from '../../shared/types/roles'
 import type { MatchOutcome, Side } from '../matches/match.types'
 
 export type { MatchOutcome, Side }
@@ -36,6 +37,7 @@ export interface Lobby {
   id: string
   mode: QueueMode // vote: capitães por votação · ranked: os 2 melhores da tabela
   rankPositions: Map<number, number | null> // posição de cada jogador na tabela quando o lobby abriu
+  roles: Map<number, PlayerRoles> // roles de cada jogador (do perfil) quando o lobby abriu
   players: LobbyPlayer[]
   phase: LobbyPhase
   votes: Map<number, number> // votação de capitães: quem votou -> em quem votou
@@ -120,6 +122,7 @@ export interface LobbySnapshot {
     isCaptain: boolean
     team: Side | null
     rankPosition: number | null // posição na tabela (null = ainda sem partidas)
+    roles: PlayerRoles
   }[]
   myVote: number | null
   votedCount: number

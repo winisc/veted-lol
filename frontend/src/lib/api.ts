@@ -12,10 +12,12 @@ export const tokenStorage = {
 
 export class ApiError extends Error {
   status: number
+  code?: string // código do servidor para casos que o app trata (ex.: 'ROLES_REQUIRED')
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -37,6 +39,6 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   }
 
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new ApiError(data.error ?? 'Erro inesperado.', res.status)
+  if (!res.ok) throw new ApiError(data.error ?? 'Erro inesperado.', res.status, data.code)
   return data as T
 }

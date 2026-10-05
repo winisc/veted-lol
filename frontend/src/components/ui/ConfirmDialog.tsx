@@ -9,6 +9,7 @@ interface Props {
   confirmVariant?: HexVariant // 'danger' para ações destrutivas
   cancelLabel?: string
   busy?: boolean
+  confirmDisabled?: boolean // ex.: formulário incompleto
   onConfirm?: () => void
   onCancel: () => void
   // Rodapé próprio no lugar de Cancelar/Confirmar (ex.: escolher entre várias opções).
@@ -24,6 +25,7 @@ export default function ConfirmDialog({
   confirmVariant = 'primary',
   cancelLabel = 'Cancelar',
   busy,
+  confirmDisabled,
   onConfirm,
   onCancel,
   actions,
@@ -61,7 +63,7 @@ export default function ConfirmDialog({
               <HexButton variant="secondary" onClick={onCancel} disabled={busy}>
                 {cancelLabel}
               </HexButton>
-              <HexButton ref={confirmRef} variant={confirmVariant} onClick={onConfirm} disabled={busy}>
+              <HexButton ref={confirmRef} variant={confirmVariant} onClick={onConfirm} disabled={busy || confirmDisabled}>
                 {confirmLabel}
               </HexButton>
             </div>

@@ -7,5 +7,6 @@ const authRoutes = Router()
 authRoutes.post('/register', authController.register)
 authRoutes.post('/login', authController.login)
 authRoutes.get('/me', requireAuth, authController.me)
+authRoutes.post('/password', requireAuth, authController.changePassword)
 
 export default authRoutes

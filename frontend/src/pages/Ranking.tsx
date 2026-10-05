@@ -2,9 +2,10 @@ import { Fragment } from "react";
 import { YouBadge } from "../components/ui/Badges";
 import Notice from "../components/ui/Notice";
 import PageHero from "../components/ui/PageHero";
+import PlayerLink from "../components/ui/PlayerLink";
 import ScoringRules from "../components/ui/ScoringRules";
 import SummonerIcon from "../components/ui/SummonerIcon";
-import { CrownIcon } from "../components/ui/icons";
+import { CrownIcon, FishIcon, StarIcon } from "../components/ui/icons";
 import { useAuth } from "../context/AuthContext";
 import { useApi } from "../hooks/useApi";
 import { pageSplash } from "../lib/ddragon";
@@ -81,7 +82,7 @@ function Podium({ top, myId }: { top: RankingEntry[]; myId?: number }) {
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1.5 truncate font-display text-lg leading-tight text-gold-50">
                 {first && <CrownIcon className="h-4 w-4 shrink-0 text-gold-200" />}
-                <span className="truncate">{name}</span>
+                <PlayerLink userId={entry.userId} className="truncate">{name}</PlayerLink>
               </p>
               <p className="flex items-center gap-2 text-xs text-ash">
                 <span>#{tag}</span>
@@ -98,6 +99,109 @@ function Podium({ top, myId }: { top: RankingEntry[]; myId?: number }) {
         );
       })}
     </ol>
+  );
+}
+
+// Destaques da tabela, estilo "prêmio": o líder em evidência (ícone grande, nome e contagem)
+// e os dois seguintes numa linha discreta embaixo. Só entra quem tem pelo menos 1.
+const awards = [
+  {
+    key: "mvps",
+    title: "Rei do MVP",
+    unit: (n: number) => (n === 1 ? "MVP" : "MVPs"),
+    empty: "Ninguém foi MVP ainda.",
+    Icon: StarIcon,
+    text: "text-gold-200",
+    bar: "bg-gold-200",
+    medal: "bg-gold-200 text-void",
+    ring: "gold",
+  },
+  {
+    key: "bagres",
+    title: "Rei do bagre",
+    unit: (n: number) => (n === 1 ? "bagre" : "bagres"),
+    empty: "Ninguém foi bagre ainda.",
+    Icon: FishIcon,
+    text: "text-bagre",
+    bar: "bg-bagre",
+    medal: "bg-bagre text-void",
+    ring: "bagre",
+  },
+] as const;
+
+function AwardLeaders({ ranking, myId }: { ranking: RankingEntry[]; myId?: number }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {awards.map(({ key, title, unit, empty, Icon, text, bar, medal, ring }) => {
+        // Empate: quem jogou menos partidas fica na frente (mais por jogo).
+        const leaders = ranking
+          .filter((e) => (e[key] ?? 0) > 0)
+          .sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0) || a.games - b.games)
+          .slice(0, 3);
+        const [leader, ...rest] = leaders;
+        const count = leader ? (leader[key] ?? 0) : 0;
+        const [name, tag] = leader ? splitRiotId(leader.riotId) : ["", ""];
+
+        return (
+          <section key={key} className="relative overflow-hidden rounded-xl border border-rim bg-abyss">
+            <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${bar}`} />
+            <div className="flex items-center gap-4 py-3 pl-5 pr-4">
+              {leader ? (
+                <SummonerIcon
+                  iconId={leader.iconId}
+                  size="lg"
+                  ring={ring}
+                  badge={
+                    <span className={`grid h-5 w-5 place-items-center rounded-full ${medal}`}>
+                      <Icon className="h-3 w-3" />
+                    </span>
+                  }
+                />
+              ) : (
+                <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-full border border-dashed border-rim ${text}`}>
+                  <Icon className="h-6 w-6" />
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${text}`}>
+                  <Icon className="h-3.5 w-3.5" /> {title}
+                </p>
+                {leader ? (
+                  <>
+                    <p className="flex items-center gap-2 truncate font-display text-2xl leading-tight text-gold-50">
+                      <PlayerLink userId={leader.userId} className="truncate">{name}</PlayerLink>
+                      {leader.userId === myId && <YouBadge />}
+                    </p>
+                    <p className="text-xs text-ash">#{tag}</p>
+                  </>
+                ) : (
+                  <p className="mt-0.5 text-sm text-ash">{empty}</p>
+                )}
+              </div>
+              {leader && (
+                <p className="shrink-0 text-right">
+                  <span className={`block font-cond text-4xl font-bold leading-none tabular-nums ${text}`}>{count}</span>
+                  <span className="text-xs text-ash">{unit(count)}</span>
+                </p>
+              )}
+            </div>
+
+            {rest.length > 0 && (
+              <ol className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-rim py-2 pl-5 pr-4 text-sm">
+                {rest.map((entry, i) => (
+                  <li key={entry.userId} className="flex min-w-0 items-center gap-1.5">
+                    <span className="font-cond font-bold text-ash-dim">{i + 2}º</span>
+                    <SummonerIcon iconId={entry.iconId} size="xs" ring="dim" />
+                    <PlayerLink userId={entry.userId} className="truncate font-semibold text-gold-50">{splitRiotId(entry.riotId)[0]}</PlayerLink>
+                    <span className={`font-cond font-bold tabular-nums ${text}`}>{entry[key]}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
@@ -146,6 +250,7 @@ export default function Ranking() {
       ) : (
         <>
           <Podium top={ranking.slice(0, 3)} myId={user?.id} />
+          <AwardLeaders ranking={ranking} myId={user?.id} />
 
           <ul className="flex flex-wrap gap-2" aria-label="Legenda das zonas">
             {zoneOrder.map((zone) => (
@@ -218,7 +323,7 @@ export default function Ranking() {
                                   <p
                                     className={`flex items-center gap-2 truncate text-gold-50 ${isMe ? "font-bold" : "font-semibold"}`}
                                   >
-                                    <span className="truncate">{name}</span>
+                                    <PlayerLink userId={entry.userId} className="truncate">{name}</PlayerLink>
                                     {isMe && <YouBadge />}
                                   </p>
                                   <p className="text-xs text-ash">#{tag}</p>

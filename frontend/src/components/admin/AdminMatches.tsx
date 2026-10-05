@@ -21,7 +21,66 @@ interface AdminMatch {
   outcome: MatchOutcome
   mvpId: number | null
   bagreId: number | null
+  votes?: { kind: 'mvp' | 'bagre'; voterId: number; targetId: number }[] // auditoria (só admin)
   players: { userId: number; riotId: string; iconId: number; side: Side; isCaptain: boolean }[]
+}
+
+// Auditoria: quem votou em quem no MVP e no bagre. Fica fechada até o admin abrir.
+function VoteAudit({ match }: { match: AdminMatch }) {
+  const [open, setOpen] = useState(false)
+  const votes = match.votes ?? []
+  if (votes.length === 0) return null
+  const name = (id: number) => {
+    const p = match.players.find((x) => x.userId === id)
+    return p ? splitRiotId(p.riotId)[0] : `#${id}`
+  }
+
+  return (
+    <div className="mt-3 border-t border-rim pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-xs font-semibold text-ash hover:text-gold-50"
+        aria-expanded={open}
+      >
+        {open ? 'Esconder votos' : `Ver votos (${votes.length})`}
+      </button>
+      {open && (
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {(
+            [
+              ['mvp', 'MVP', 'text-gold-200', <StarIcon key="s" className="h-3.5 w-3.5" />],
+              ['bagre', 'Bagre', 'text-bagre', <FishIcon key="f" className="h-3.5 w-3.5" />],
+            ] as const
+          ).map(([kind, label, color, icon]) => {
+            const list = votes.filter((v) => v.kind === kind)
+            return (
+              <div key={kind}>
+                <p className={`mb-1 flex items-center gap-1 text-xs font-semibold ${color}`}>
+                  {icon} {label} · {list.length} {list.length === 1 ? 'voto' : 'votos'}
+                </p>
+                {list.length === 0 ? (
+                  <p className="text-xs text-ash-dim">Ninguém votou.</p>
+                ) : (
+                  <ul className="space-y-0.5 text-sm">
+                    {list.map((v) => (
+                      <li key={v.voterId} className="flex items-center gap-1.5">
+                        <span className="truncate text-ash">{name(v.voterId)}</span>
+                        <span className="text-ash-dim">→</span>
+                        <span className="truncate font-semibold text-gold-50">
+                          {v.voterId === v.targetId ? 'si mesmo' : name(v.targetId)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 type Pending = { kind: 'edit'; match: AdminMatch } | { kind: 'delete'; match: AdminMatch }
@@ -104,6 +163,8 @@ export default function AdminMatches() {
                     </div>
                   ))}
                 </div>
+
+                <VoteAudit match={match} />
               </li>
             )
           })}

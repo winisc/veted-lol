@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { splitRiotId } from '../../lib/teams'
 import SummonerIcon, { type IconRing, type IconSize } from './SummonerIcon'
 
@@ -12,6 +13,7 @@ interface Props {
   badges?: ReactNode // na mesma linha do nome
   right?: ReactNode // canto direito
   onClick?: () => void // vira botão (ex.: pick no draft)
+  to?: string // vira link (ex.: perfil do jogador)
   disabled?: boolean
   className?: string
 }
@@ -27,6 +29,7 @@ export default function PlayerRow({
   badges,
   right,
   onClick,
+  to,
   disabled,
   className = '',
 }: Props) {
@@ -47,6 +50,14 @@ export default function PlayerRow({
       {right && <div className="shrink-0">{right}</div>}
     </>
   )
+
+  if (to) {
+    return (
+      <Link to={to} className={`${classes} transition-colors hover:border-gold-200/60 hover:bg-rim`}>
+        {body}
+      </Link>
+    )
+  }
 
   if (!onClick) return <div className={classes}>{body}</div>
 

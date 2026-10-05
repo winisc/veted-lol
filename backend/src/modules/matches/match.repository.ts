@@ -1,13 +1,15 @@
 import db from '../../database/db'
 import { resolveIconId } from '../../shared/utils/icons'
-import type { AdminMatch, AdminMatchPlayerRow, HistoryRow, MatchOutcome, NewMatch, PlayerStats, RankingRow } from './match.types'
+import { formatRiotId } from '../../shared/utils/riotId'
+import type { AdminMatch, AdminMatchPlayerRow, MatchDetail, MatchVote, PlayerResult, Rival, HistoryRow, MatchOutcome, NewMatch, PlayerStats, RankingRow } from './match.types'
 
 const insertMatch = db.prepare(
   'INSERT INTO matches (id, mode, started_at, ended_at, duration_seconds, outcome, mvp_user_id, bagre_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
 )
 const insertPlayer = db.prepare(
-  'INSERT INTO match_players (match_id, user_id, side, is_captain, result, is_mvp, is_bagre) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  'INSERT INTO match_players (match_id, user_id, side, is_captain, result, is_mvp, is_bagre, pick_order, picked_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
 )
+const insertVote = db.prepare('INSERT INTO match_votes (match_id, kind, voter_id, target_id) VALUES (?, ?, ?, ?)')
 
 // Tudo ou nada: a partida e os 10 jogadores são gravados na mesma transação.
 const saveTransaction = db.transaction((match: NewMatch) => {
@@ -33,8 +35,11 @@ const saveTransaction = db.transaction((match: NewMatch) => {
       result,
       player.userId === match.mvpId ? 1 : 0,
       player.userId === match.bagreId ? 1 : 0,
+      player.pickOrder,
+      player.pickedBy,
     )
   }
+  for (const vote of match.votes) insertVote.run(match.id, vote.kind, vote.voterId, vote.targetId)
 })
 
 export const matchRepository = {
@@ -101,6 +106,102 @@ export const matchRepository = {
     return rows.map((r) => ({ ...r, isCaptain: r.isCaptain === 1, isMvp: r.isMvp === 1, isBagre: r.isBagre === 1 }))
   },
 
+  // ---- Detalhe da partida e estatísticas ----
+
+  findDetail(matchId: string): MatchDetail | null {
+    const match = db
+      .prepare(
+        `SELECT id, mode, started_at AS startedAt, ended_at AS endedAt, duration_seconds AS durationSeconds,
+                outcome, mvp_user_id AS mvpId, bagre_user_id AS bagreId
+         FROM matches WHERE id = ?`,
+      )
+      .get(matchId) as Omit<MatchDetail, 'players' | 'hasVotes'> | undefined
+    if (!match) return null
+
+    const rows = db
+      .prepare(
+        `SELECT mp.user_id AS userId, u.game_name AS gameName, u.tag_line AS tagLine, u.profile_icon_id AS profileIconId,
+                mp.side, mp.is_captain AS isCaptain, mp.result, mp.pick_order AS pickOrder, mp.picked_by AS pickedBy
+         FROM match_players mp LEFT JOIN users u ON u.id = mp.user_id
+         WHERE mp.match_id = ?`,
+      )
+      .all(matchId) as (AdminMatchPlayerRow & { pickOrder: number | null; pickedBy: number | null })[]
+
+    // Só a contagem de votos por jogador (quem votou em quem é só do admin).
+    const votes = db
+      .prepare('SELECT kind, target_id AS targetId, COUNT(*) AS n FROM match_votes WHERE match_id = ? GROUP BY kind, target_id')
+      .all(matchId) as { kind: string; targetId: number; n: number }[]
+    const countFor = (kind: string, userId: number) => votes.find((v) => v.kind === kind && v.targetId === userId)?.n ?? 0
+
+    return {
+      ...match,
+      hasVotes: votes.length > 0,
+      players: rows.map((p) => ({
+        userId: p.userId,
+        riotId: p.gameName ? formatRiotId(p.gameName, p.tagLine ?? '') : `Conta removida (${p.userId})`,
+        iconId: resolveIconId(p.userId, p.profileIconId),
+        side: p.side,
+        isCaptain: p.isCaptain === 1,
+        result: p.result,
+        pickOrder: p.pickOrder,
+        pickedBy: p.pickedBy,
+        mvpVotes: countFor('mvp', p.userId),
+        bagreVotes: countFor('bagre', p.userId),
+      })),
+    }
+  },
+
+  // Resultados do jogador, do mais recente para o mais antigo (sem remakes), para as sequências.
+  resultsForUser(userId: number): ('win' | 'loss')[] {
+    const rows = db
+      .prepare(
+        `SELECT mp.result AS result
+         FROM match_players mp JOIN matches m ON m.id = mp.match_id
+         WHERE mp.user_id = ? AND mp.result != 'remake'
+         ORDER BY m.ended_at DESC`,
+      )
+      .all(userId) as { result: PlayerResult }[]
+    return rows.map((r) => r.result as 'win' | 'loss')
+  },
+
+  captainStats(userId: number): { games: number; wins: number } {
+    return db
+      .prepare(
+        `SELECT COUNT(*) AS games, COALESCE(SUM(result = 'win'), 0) AS wins
+         FROM match_players WHERE user_id = ? AND is_captain = 1 AND result != 'remake'`,
+      )
+      .get(userId) as { games: number; wins: number }
+  },
+
+  // Contra quem o jogador já jogou (times opostos): vitórias e derrotas dele contra cada adversário.
+  headToHead(userId: number): Rival[] {
+    const rows = db
+      .prepare(
+        `SELECT o.user_id AS userId, u.game_name AS gameName, u.tag_line AS tagLine, u.profile_icon_id AS profileIconId,
+                SUM(me.result = 'win') AS wins, SUM(me.result = 'loss') AS losses
+         FROM match_players me
+         JOIN match_players o ON o.match_id = me.match_id AND o.side != me.side
+         JOIN users u ON u.id = o.user_id
+         WHERE me.user_id = ? AND me.result != 'remake'
+         GROUP BY o.user_id`,
+      )
+      .all(userId) as {
+      userId: number
+      gameName: string
+      tagLine: string
+      profileIconId: number | null
+      wins: number
+      losses: number
+    }[]
+    return rows.map((r) => ({
+      userId: r.userId,
+      riotId: formatRiotId(r.gameName, r.tagLine),
+      iconId: resolveIconId(r.userId, r.profileIconId),
+      wins: r.wins,
+      losses: r.losses,
+    }))
+  },
+
   // ---- Admin ----
 
   // Partidas mais recentes com os jogadores de cada uma.
@@ -111,7 +212,10 @@ export const matchRepository = {
                 outcome, mvp_user_id AS mvpId, bagre_user_id AS bagreId
          FROM matches ORDER BY ended_at DESC LIMIT ?`,
       )
-      .all(limit) as Omit<AdminMatch, 'players'>[]
+      .all(limit) as Omit<AdminMatch, 'players' | 'votes'>[]
+    const votesOf = db.prepare(
+      'SELECT kind, voter_id AS voterId, target_id AS targetId FROM match_votes WHERE match_id = ? ORDER BY kind, voter_id',
+    )
     const playersOf = db.prepare(
       `SELECT mp.user_id AS userId, u.game_name AS gameName, u.tag_line AS tagLine, u.profile_icon_id AS profileIconId,
               mp.side, mp.is_captain AS isCaptain, mp.result
@@ -120,6 +224,7 @@ export const matchRepository = {
     )
     return matches.map((m) => ({
       ...m,
+      votes: votesOf.all(m.id) as MatchVote[],
       players: (playersOf.all(m.id) as AdminMatchPlayerRow[]).map((p) => ({
         userId: p.userId,
         riotId: p.gameName ? `${p.gameName}#${p.tagLine}` : `Conta removida (${p.userId})`,
@@ -168,6 +273,7 @@ export const matchRepository = {
 
   delete(matchId: string): boolean {
     const remove = db.transaction(() => {
+      db.prepare('DELETE FROM match_votes WHERE match_id = ?').run(matchId)
       db.prepare('DELETE FROM match_players WHERE match_id = ?').run(matchId)
       return db.prepare('DELETE FROM matches WHERE id = ?').run(matchId).changes > 0
     })

@@ -7,6 +7,8 @@ import { formatDate, formatPercent } from '../../lib/format'
 import { splitRiotId } from '../../lib/teams'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import SummonerIcon from '../ui/SummonerIcon'
+import RoleIcons from '../ui/RoleIcons'
+import type { PlayerRoles } from '../../lib/roles'
 import { ActionFeedback, Empty, RowAction } from './adminShared'
 
 interface AdminUser {
@@ -16,6 +18,7 @@ interface AdminUser {
   isAdmin: boolean
   adminFromEnv: boolean
   createdAt: string
+  roles?: PlayerRoles
   games: number
   wins: number
   losses: number
@@ -79,6 +82,7 @@ export default function AdminUsers() {
             <thead className="bg-panel text-xs text-ash">
               <tr>
                 <th className="px-3 py-2.5 font-semibold">Invocador</th>
+                <th className="px-3 py-2.5 font-semibold">Roles</th>
                 <th className="px-3 py-2.5 text-right font-semibold">Partidas</th>
                 <th className="px-3 py-2.5 text-right font-semibold">V / D</th>
                 <th className="px-3 py-2.5 text-right font-semibold">Win rate</th>
@@ -109,6 +113,9 @@ export default function AdminUsers() {
                           <p className="text-xs text-ash">#{tag}</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      {u.roles?.main ? <RoleIcons roles={u.roles} /> : <span className="text-xs text-ash-dim">Sem roles</span>}
                     </td>
                     <td className="px-3 py-2 text-right font-cond text-base tabular-nums text-gold-50">{u.games}</td>
                     <td className="px-3 py-2 text-right font-cond text-base tabular-nums">

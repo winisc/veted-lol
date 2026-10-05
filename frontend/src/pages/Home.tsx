@@ -5,6 +5,7 @@ import Notice from "../components/ui/Notice";
 import PageHero from "../components/ui/PageHero";
 import Panel from "../components/ui/Panel";
 import PlayerRow from "../components/ui/PlayerRow";
+import { useProfilePath } from "../components/ui/PlayerLink";
 import SummonerIcon from "../components/ui/SummonerIcon";
 import { FishIcon, StarIcon } from "../components/ui/icons";
 import { useAuth } from "../context/AuthContext";
@@ -246,6 +247,7 @@ function RecordBody({
 }
 
 function TopRanking({ ranking }: { ranking?: RankingEntry[] }) {
+  const profilePath = useProfilePath();
   const { user } = useAuth();
   const top = ranking?.slice(0, 5) ?? [];
 
@@ -272,6 +274,7 @@ function TopRanking({ ranking }: { ranking?: RankingEntry[] }) {
               <PlayerRow
                 riotId={entry.riotId}
                 iconId={entry.iconId}
+                to={profilePath(entry.userId)}
                 ring={zones[entry.zone].ring}
                 highlight={entry.userId === user?.id}
                 badges={

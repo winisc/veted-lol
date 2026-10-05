@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Request, Response } from 'express'
 import { AppError } from '../../shared/errors/AppError'
+import { loadState, registerPersistence, schedulePersist } from '../../database/runtimeState'
 import { appEvents } from '../../shared/events/appEvents'
 import { lobbyConfig } from './lobby.config'
 import { lobbyEvents } from './lobby.events'
@@ -21,8 +22,17 @@ import type { Lobby, LobbyEvent, LobbyPhase, LobbyPlayer, LobbySnapshot, MatchOu
 import type { QueueMode } from '../../shared/types/modes'
 import { matchRepository } from '../matches/match.repository'
 import { getRanking } from '../ranking/ranking.service'
+import { userRepository } from '../users/user.repository'
 
 const timers = new Map<string, NodeJS.Timeout>()
+
+// Os lobbies são guardados no banco a cada mudança, para sobreviver a um reinício do servidor.
+// Mude STATE_VERSION quando o formato do Lobby mudar: estados guardados com outra versão são descartados.
+const STATE_KEY = 'lobbies'
+const STATE_VERSION = 1
+// Depois de reiniciar, ninguém está conectado ainda: dá este tempo mínimo para as fases com prazo.
+const RESTORE_GRACE_MS = 8_000
+registerPersistence(STATE_KEY, () => ({ version: STATE_VERSION, lobbies: lobbyRepository.all() }))
 
 const randomItem = <T>(items: T[]): T => items[Math.floor(Math.random() * items.length)]
 const otherSide = (side: Side): Side => (side === 'blue' ? 'red' : 'blue')
@@ -41,6 +51,7 @@ function sendTo(userId: number, event: LobbyEvent) {
 }
 
 function broadcast(lobby: Lobby) {
+  schedulePersist(STATE_KEY)
   for (const player of lobby.players) {
     if (lobby.left.has(player.userId)) continue // já saiu do lobby
     sendTo(player.userId, { lobby: snapshotFor(lobby, player.userId) })
@@ -51,6 +62,33 @@ function clearTimer(lobbyId: string) {
   const timer = timers.get(lobbyId)
   if (timer) clearTimeout(timer)
   timers.delete(lobbyId)
+}
+
+// O que acontece quando o prazo da fase atual acaba (as mesmas ações de quando a fase começa).
+// Fases sem prazo (partida, resultado, fim) devolvem null.
+function timeoutAction(lobby: Lobby): (() => void) | null {
+  switch (lobby.phase) {
+    case 'voting':
+      return () => finishVoting(lobby)
+    case 'captains':
+      return () => startCoinflip(lobby)
+    case 'coinflip':
+      return () => startSide(lobby)
+    case 'side':
+      return () => applySide(lobby, randomItem<Side>(['blue', 'red']))
+    case 'picking':
+      return () => autoPick(lobby)
+    case 'done':
+      return () => startPlaying(lobby)
+    case 'mvp':
+      return () => finishMvp(lobby)
+    case 'bagre':
+      return () => finishBagre(lobby)
+    case 'rematch':
+      return () => startRematch(lobby)
+    default:
+      return null
+  }
 }
 
 // Entra em uma fase. Se ela tiver duração, `onTimeout` roda quando o tempo acabar.
@@ -227,11 +265,20 @@ function finishMatch(lobby: Lobby) {
       outcome: lobby.outcome!,
       mvpId: lobby.mvpId,
       bagreId: lobby.bagreId,
-      players: lobby.players.map((p) => ({
-        userId: p.userId,
-        side: lobby.teams.blue.includes(p.userId) ? 'blue' : 'red',
-        isCaptain: lobby.captains.includes(p.userId),
-      })),
+      votes: [
+        ...[...lobby.mvpVotes].map(([voterId, targetId]) => ({ kind: 'mvp' as const, voterId, targetId })),
+        ...[...lobby.bagreVotes].map(([voterId, targetId]) => ({ kind: 'bagre' as const, voterId, targetId })),
+      ],
+      players: lobby.players.map((p) => {
+        const pick = lobby.picks.find((pk) => pk.playerId === p.userId)
+        return {
+          userId: p.userId,
+          side: lobby.teams.blue.includes(p.userId) ? ('blue' as const) : ('red' as const),
+          isCaptain: lobby.captains.includes(p.userId),
+          pickOrder: pick?.order ?? null,
+          pickedBy: pick?.byId ?? null,
+        }
+      }),
     })
   } catch (err) {
     // Não trava os jogadores se o banco falhar; o resultado ainda aparece na tela.
@@ -255,6 +302,7 @@ function finishMatch(lobby: Lobby) {
 // Fecha o lobby para todos, avisando o motivo (quem causou o cancelamento não recebe aviso).
 function cancelLobby(lobby: Lobby, notice: string, causedBy?: number) {
   clearTimer(lobby.id)
+  schedulePersist(STATE_KEY)
   for (const player of lobby.players) {
     if (lobby.left.has(player.userId)) continue
     sendTo(player.userId, { lobby: null, notice: player.userId === causedBy ? undefined : notice })
@@ -275,6 +323,23 @@ function requireLobby(userId: number): Lobby {
 }
 
 export const lobbyService = {
+  // Recupera os lobbies guardados e religa o relógio de cada fase. Devolve quantos voltaram.
+  restore(): number {
+    const saved = loadState<{ version: number; lobbies: Lobby[] }>(STATE_KEY)
+    if (!saved || saved.version !== STATE_VERSION) return 0
+
+    for (const lobby of saved.lobbies) {
+      lobbyRepository.restore(lobby)
+      const action = timeoutAction(lobby)
+      if (action && lobby.endsAt !== null) {
+        const remaining = Math.max(lobby.endsAt - Date.now(), RESTORE_GRACE_MS)
+        lobby.endsAt = Date.now() + remaining
+        timers.set(lobby.id, setTimeout(action, remaining))
+      }
+    }
+    return saved.lobbies.length
+  },
+
   create(players: LobbyPlayer[], mode: QueueMode = 'vote'): Lobby {
     // Posição de cada um na tabela agora (mostrada na tela e usada no modo tabela).
     const ranking = getRanking()
@@ -282,10 +347,15 @@ export const lobbyService = {
       players.map((p) => [p.userId, ranking.find((e) => e.userId === p.userId)?.position ?? null] as const),
     )
 
+    const roles = new Map(
+      players.map((p) => [p.userId, userRepository.findById(p.userId)?.roles ?? { main: null, secondary: null, worst: null }] as const),
+    )
+
     const lobby: Lobby = {
       id: randomUUID(),
       mode,
       rankPositions,
+      roles,
       players,
       phase: 'voting',
       votes: new Map(),
@@ -418,7 +488,7 @@ export const lobbyService = {
     return snapshotFor(lobby, userId)
   },
 
-  // Voto do bagre (o pior da partida) entre os jogadores do time perdedor. Mesmas regras do MVP.
+  // Voto do bagre (o pior da partida) entre os jogadores do time perdedor. Igual ao MVP, mas pode votar em si mesmo.
   voteBagre(userId: number, targetId: unknown): LobbySnapshot {
     const lobby = requireLobby(userId)
     if (lobby.phase !== 'bagre') throw new AppError('Não é o momento de votar no bagre.', 409)
@@ -426,8 +496,7 @@ export const lobbyService = {
     if (typeof targetId !== 'number' || !bagreCandidates(lobby).includes(targetId)) {
       throw new AppError('Esse jogador não é do time perdedor.', 400)
     }
-    if (targetId === userId) throw new AppError('Você não pode votar em si mesmo.', 400)
-
+    // No bagre vale votar em si mesmo (autocrítica).
     lobby.bagreVotes.set(userId, targetId)
     if (lobby.bagreVotes.size === lobby.players.length) finishBagre(lobby)
     else broadcast(lobby)
@@ -544,6 +613,9 @@ export const lobbyService = {
     lobby.outcome = outcome
     lobby.mvpId = null
     lobby.bagreId = null
+    // Sem MVP nem bagre, os votos parciais também não são guardados.
+    lobby.mvpVotes = new Map()
+    lobby.bagreVotes = new Map()
     finishMatch(lobby)
   },
 

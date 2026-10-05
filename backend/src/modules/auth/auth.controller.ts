@@ -13,6 +13,12 @@ export const authController = {
     res.json(await authService.login(riotId, password))
   },
 
+  async changePassword(req: AuthRequest, res: Response) {
+    const { currentPassword, newPassword } = req.body ?? {}
+    await authService.changePassword(req.userId!, currentPassword, newPassword)
+    res.json({ ok: true })
+  },
+
   me(req: AuthRequest, res: Response) {
     res.json({ user: authService.me(req.userId!) })
   },

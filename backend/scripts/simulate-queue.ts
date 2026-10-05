@@ -165,7 +165,10 @@ async function ensureBotUsers(): Promise<string[]> {
   const ids: string[] = []
   for (let i = 1; i <= count; i++) {
     const riot = { gameName: `Bot${String(i).padStart(2, '0')}`, tagLine: TAG }
-    if (!userRepository.findByRiotId(riot)) userRepository.create(riot, hash)
+    const user = userRepository.findByRiotId(riot) ?? userRepository.create(riot, hash)
+    // A fila exige as 3 roles no perfil: cada bot recebe roles diferentes (em rodízio).
+    const order = ['top', 'jungle', 'mid', 'adc', 'support'] as const
+    userRepository.setRoles(user.id, { main: order[i % 5], secondary: order[(i + 1) % 5], worst: order[(i + 3) % 5] })
     ids.push(`${riot.gameName}#${TAG}`)
   }
   return ids

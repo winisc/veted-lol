@@ -1,45 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueue } from '../context/QueueContext'
 import { queueModes } from '../lib/modes'
+import { showMatchFound } from '../lib/notify'
+import { FOUND_SOUND_URL, getQueueVolume } from '../lib/sound'
 import HexButton from './ui/HexButton'
 import { CheckIcon } from './ui/icons'
 
 const RING_RADIUS = 52
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS
 
-// Bipe curto quando a partida é encontrada (como no cliente do LoL). Falhas são ignoradas
-// (alguns navegadores bloqueiam som sem interação; quem entrou na fila clicou, então costuma funcionar).
-function playFoundSound() {
-  try {
-    const ctx = new AudioContext()
-    const gain = ctx.createGain()
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.02)
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6)
-    gain.connect(ctx.destination)
-    for (const [freq, start] of [
-      [660, 0],
-      [880, 0.15],
-    ] as const) {
-      const osc = ctx.createOscillator()
-      osc.type = 'sine'
-      osc.frequency.value = freq
-      osc.connect(gain)
-      osc.start(ctx.currentTime + start)
-      osc.stop(ctx.currentTime + start + 0.3)
-    }
-    setTimeout(() => ctx.close(), 1000)
-  } catch {
-    // sem som, sem problema
-  }
-}
+// Som de partida encontrada: toca em loop até o jogador aceitar ou recusar, ou a confirmação acabar,
+// no volume escolhido em "Som da fila". Se o navegador bloquear o som (sem interação na página), segue sem som.
 
 // Popup global "Partida encontrada": aparece em qualquer aba quando a fila fecha.
 export default function ReadyCheckModal() {
   const { snapshot, skew, busy, accept, decline } = useQueue()
   const check = snapshot?.status === 'ready_check' ? snapshot.readyCheck : null
   const [msLeft, setMsLeft] = useState(0)
-  const announced = useRef(false)
 
   // Contagem regressiva sincronizada com o servidor.
   useEffect(() => {
@@ -50,22 +27,39 @@ export default function ReadyCheckModal() {
     return () => clearInterval(timer)
   }, [check?.endsAt, skew])
 
-  // Som + título da aba enquanto a confirmação está aberta (chama atenção se o jogador estiver em outra aba).
+  // Título da aba enquanto a confirmação está aberta (chama atenção se o jogador estiver em outra aba).
   useEffect(() => {
-    if (!check) {
-      announced.current = false
-      return
-    }
-    if (!announced.current) {
-      announced.current = true
-      playFoundSound()
-    }
+    if (!check) return
     const original = document.title
     document.title = 'Partida encontrada! · x5 Veted'
     return () => {
       document.title = original
     }
   }, [Boolean(check)])
+
+  // Notificação do navegador enquanto o jogador ainda não respondeu (só se a aba não estiver à vista).
+  const ringing = Boolean(check) && !check?.iAccepted
+  const modeName = snapshot?.mode ? queueModes[snapshot.mode].name : ''
+  useEffect(() => {
+    if (!ringing) return
+    const notification = showMatchFound(`${modeName}: aceite para entrar no lobby.`)
+    return () => notification?.close()
+  }, [ringing, modeName])
+
+  // Som em loop enquanto o jogador ainda não respondeu.
+  useEffect(() => {
+    if (!ringing) return
+    const volume = getQueueVolume()
+    if (volume === 0) return
+    const audio = new Audio(FOUND_SOUND_URL)
+    audio.loop = true
+    audio.volume = volume
+    audio.play().catch(() => {})
+    return () => {
+      audio.pause()
+      audio.src = ''
+    }
+  }, [ringing])
 
   if (!check) return null
 

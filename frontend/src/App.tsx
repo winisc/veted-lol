@@ -6,6 +6,7 @@ import Admin from './pages/Admin'
 import Home from './pages/Home'
 import Lobby from './pages/Lobby'
 import Login from './pages/Login'
+import MatchDetail from './pages/MatchDetail'
 import NotFound from './pages/NotFound'
 import Profile from './pages/Profile'
 import Ranking from './pages/Ranking'
@@ -24,6 +25,8 @@ export default function App() {
           <Route index element={<Home />} />
           <Route path="lobby" element={<Lobby />} />
           <Route path="perfil" element={<Profile />} />
+          <Route path="jogador/:id" element={<Profile />} />
+          <Route path="partida/:id" element={<MatchDetail />} />
           <Route path="tabela" element={<Ranking />} />
           <Route path="admin" element={<Admin />} />
           <Route path="ranking" element={<Navigate to="/tabela" replace />} />

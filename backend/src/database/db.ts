@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import path from 'node:path'
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data.db')
+export const dbPath = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data.db')
 
 const db = new Database(dbPath)
 db.pragma('journal_mode = WAL')
@@ -37,6 +37,15 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_match_players_user ON match_players (user_id);
+
+  -- Auditoria dos votos de MVP e bagre: quem votou em quem. Só o admin vê.
+  CREATE TABLE IF NOT EXISTS match_votes (
+    match_id TEXT NOT NULL,
+    kind TEXT NOT NULL,             -- 'mvp' | 'bagre'
+    voter_id INTEGER NOT NULL,
+    target_id INTEGER NOT NULL,
+    PRIMARY KEY (match_id, kind, voter_id)
+  );
 `)
 
 // Migrações simples para bancos criados antes de uma coluna existir.
@@ -58,9 +67,20 @@ if (!matchColumns.some((c) => c.name === 'bagre_user_id')) {
   // Bagre: o pior jogador da partida, votado entre os perdedores (perde pontos na tabela).
   db.exec('ALTER TABLE matches ADD COLUMN bagre_user_id INTEGER')
 }
+if (!userColumns.some((c) => c.name === 'main_role')) {
+  // Roles do jogador (top, jungle, mid, adc, support), escolhidas no perfil. Todas opcionais.
+  db.exec('ALTER TABLE users ADD COLUMN main_role TEXT')
+  db.exec('ALTER TABLE users ADD COLUMN secondary_role TEXT')
+  db.exec('ALTER TABLE users ADD COLUMN worst_role TEXT')
+}
 const playerColumns = db.prepare('PRAGMA table_info(match_players)').all() as { name: string }[]
 if (!playerColumns.some((c) => c.name === 'is_bagre')) {
   db.exec('ALTER TABLE match_players ADD COLUMN is_bagre INTEGER NOT NULL DEFAULT 0')
+}
+if (!playerColumns.some((c) => c.name === 'pick_order')) {
+  // Draft: em que pick o jogador foi escolhido (1, 2, 3...) e por qual capitão. Capitães ficam sem valor.
+  db.exec('ALTER TABLE match_players ADD COLUMN pick_order INTEGER')
+  db.exec('ALTER TABLE match_players ADD COLUMN picked_by INTEGER')
 }
 
 export default db

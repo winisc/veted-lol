@@ -117,6 +117,39 @@
   animation: stage-glow 1.2s ease-out 0.4s both;
 }
 
+/* Tour: borda pulsante em volta do que o jogador precisa usar (ex.: definir as roles). */
+@keyframes tour-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(201 169 106 / 0.75);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgb(201 169 106 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(201 169 106 / 0);
+  }
+}
+
+.tour-pulse {
+  outline: 2px solid var(--color-gold-200);
+  outline-offset: 3px;
+  animation: tour-pulse 1.6s ease-out infinite;
+}
+
+/* Barra de tempo do aviso rápido (DroppedToast): esvazia em 8s, o mesmo tempo que ele fica na tela. */
+@keyframes drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.dropped-timer {
+  animation: drain 8s linear forwards;
+}
+
 /* Moeda do sorteio dos capitães */
 @keyframes coin-spin {
   from {

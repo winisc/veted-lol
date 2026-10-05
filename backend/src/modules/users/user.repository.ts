@@ -1,5 +1,6 @@
 import db from '../../database/db'
 import { resolveIconId } from '../../shared/utils/icons'
+import { isRole, type PlayerRoles } from '../../shared/types/roles'
 import type { RiotId } from '../../shared/utils/riotId'
 import type { User } from './user.types'
 
@@ -10,6 +11,9 @@ interface UserRow {
   password_hash: string
   profile_icon_id: number | null
   is_admin: number
+  main_role: string | null
+  secondary_role: string | null
+  worst_role: string | null
   created_at: string // 'YYYY-MM-DD HH:MM:SS' em UTC
 }
 
@@ -34,6 +38,11 @@ function toUser(row: UserRow): User {
     iconId: resolveIconId(row.id, row.profile_icon_id),
     isAdmin: row.is_admin === 1 || envAdmins().has(riotId),
     createdAt: `${row.created_at.replace(' ', 'T')}Z`,
+    roles: {
+      main: isRole(row.main_role) ? row.main_role : null,
+      secondary: isRole(row.secondary_role) ? row.secondary_role : null,
+      worst: isRole(row.worst_role) ? row.worst_role : null,
+    },
   }
 }
 
@@ -74,6 +83,15 @@ export const userRepository = {
   // Admin pelo .env não pode ser removido pela tela (só tirando do .env).
   isEnvAdmin(user: User) {
     return envAdmins().has(`${user.gameName}#${user.tagLine}`.toLowerCase())
+  },
+
+  setRoles(userId: number, roles: PlayerRoles) {
+    db.prepare('UPDATE users SET main_role = ?, secondary_role = ?, worst_role = ? WHERE id = ?').run(
+      roles.main,
+      roles.secondary,
+      roles.worst,
+      userId,
+    )
   },
 
   setPassword(userId: number, passwordHash: string) {

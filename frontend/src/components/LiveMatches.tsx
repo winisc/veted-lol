@@ -5,6 +5,7 @@ import { queueModes, type QueueMode } from '../lib/modes'
 import { formatDuration, sideStyle, splitRiotId } from '../lib/teams'
 import MatchResultCard, { useVisibleResults, type RecentResult } from './MatchResultCard'
 import { CrownIcon } from './ui/icons'
+import PlayerLink from './ui/PlayerLink'
 import Panel from './ui/Panel'
 import SummonerIcon from './ui/SummonerIcon'
 
@@ -62,7 +63,9 @@ function MatchCard({ match, skew }: { match: LiveMatch; skew: number }) {
             {match.teams[side].map((p) => (
               <li key={p.id} className="flex min-w-0 items-center gap-1.5">
                 <SummonerIcon iconId={p.iconId} size="xs" ring={sideStyle[side].ring} />
-                <span className="truncate text-sm text-gold-50">{splitRiotId(p.riotId)[0]}</span>
+                <PlayerLink userId={p.id} className="truncate text-sm text-gold-50">
+                  {splitRiotId(p.riotId)[0]}
+                </PlayerLink>
                 {p.isCaptain && <CrownIcon className="h-3 w-3 shrink-0 text-gold-200" />}
               </li>
             ))}
