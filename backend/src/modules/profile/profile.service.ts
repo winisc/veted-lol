@@ -2,6 +2,7 @@ import { AppError } from '../../shared/errors/AppError'
 import { isRole, type PlayerRoles, type Role } from '../../shared/types/roles'
 import { formatRiotId } from '../../shared/utils/riotId'
 import { matchRepository } from '../matches/match.repository'
+import type { Rival } from '../matches/match.types'
 import { computePoints, matchPoints, scoring, winRate } from '../matches/match.scoring'
 import { getRanking } from '../ranking/ranking.service'
 import { userRepository } from '../users/user.repository'
@@ -31,19 +32,31 @@ function streaks(results: ('win' | 'loss')[]) {
   return { current, bestWin, worstLoss }
 }
 
-// Adversários: o "freguês" é quem o jogador mais vence e o "carrasco" é quem mais vence o jogador.
-// Só conta quem já enfrentou pelo menos 2 vezes e só se o saldo for claramente de um lado.
-const MIN_GAMES_AGAINST = 2
+// Quem mais aparece nas vitórias e quem mais aparece nas derrotas do jogador, dentre um grupo de pessoas
+// (adversários ou parceiros). Só conta quem jogou pelo menos 2 partidas com/contra ele e só se o saldo
+// for claramente de um lado.
+const MIN_GAMES_TOGETHER = 2
 
-function rivals(userId: number) {
-  const all = matchRepository.headToHead(userId).filter((r) => r.wins + r.losses >= MIN_GAMES_AGAINST)
-  const victim = all
+function bestAndWorst(all: Rival[]) {
+  const played = all.filter((r) => r.wins + r.losses >= MIN_GAMES_TOGETHER)
+  const best = played
     .filter((r) => r.wins > r.losses)
     .sort((a, b) => b.wins - b.losses - (a.wins - a.losses) || b.wins - a.wins)[0]
-  const nemesis = all
+  const worst = played
     .filter((r) => r.losses > r.wins)
     .sort((a, b) => b.losses - b.wins - (a.losses - a.wins) || b.losses - a.losses)[0]
-  return { victim: victim ?? null, nemesis: nemesis ?? null }
+  return { best: best ?? null, worst: worst ?? null }
+}
+
+// "Freguês" é quem o jogador mais vence e "carrasco" é quem mais vence o jogador (times opostos).
+function rivals(userId: number) {
+  const { best, worst } = bestAndWorst(matchRepository.headToHead(userId))
+  return { victim: best, nemesis: worst }
+}
+
+// Duos: o parceiro com quem o jogador mais ganha e o parceiro com quem mais perde (mesmo time).
+function duos(userId: number) {
+  return bestAndWorst(matchRepository.withTeammates(userId))
 }
 
 export const profileService = {
@@ -83,6 +96,7 @@ export const profileService = {
         },
         streaks: streaks(matchRepository.resultsForUser(userId)),
         rivals: rivals(userId),
+        duos: duos(userId),
       },
       history: matchRepository.historyForUser(userId, HISTORY_LIMIT).map((match) => ({
         ...match,

@@ -14,6 +14,7 @@ interface Props {
   right?: ReactNode // canto direito
   onClick?: () => void // vira botão (ex.: pick no draft)
   to?: string // vira link (ex.: perfil do jogador)
+  fullName?: boolean // mostra o nick inteiro (quebra de linha em vez de cortar com "...")
   disabled?: boolean
   className?: string
 }
@@ -30,6 +31,7 @@ export default function PlayerRow({
   right,
   onClick,
   to,
+  fullName,
   disabled,
   className = '',
 }: Props) {
@@ -43,8 +45,8 @@ export default function PlayerRow({
       {leading && <div className="shrink-0">{leading}</div>}
       <SummonerIcon iconId={iconId} size={size} ring={ring} />
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
-        <span className="truncate font-semibold text-gold-50">{name}</span>
-        <span className="hidden text-xs text-ash xl:inline">#{tag}</span>
+        <span className={`font-semibold text-gold-50 ${fullName ? 'min-w-0 break-words' : 'truncate'}`}>{name}</span>
+        <span className={`text-xs text-ash ${fullName ? '' : 'hidden xl:inline'}`}>#{tag}</span>
         {badges}
       </div>
       {right && <div className="shrink-0">{right}</div>}

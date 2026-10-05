@@ -36,6 +36,7 @@ export default function TeamCard({ side, members, slots, mvpId, bagreId, winner,
                 iconId={member.iconId}
                 ring={member.id === mvpId ? 'gold' : member.id === bagreId ? 'bagre' : style.ring}
                 highlight={member.isYou}
+                fullName
                 right={<RoleIcons roles={member.roles} />}
                 badges={
                   <>

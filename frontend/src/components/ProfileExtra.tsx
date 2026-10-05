@@ -17,6 +17,7 @@ export interface ProfileExtraData {
   captain: { games: number; wins: number; winRate: number | null }
   streaks: { current: { type: 'win' | 'loss' | null; count: number }; bestWin: number; worstLoss: number }
   rivals: { victim: Rival | null; nemesis: Rival | null }
+  duos?: { best: Rival | null; worst: Rival | null } // ausente em servidores antigos
 }
 
 function Card({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
@@ -29,7 +30,19 @@ function Card({ label, children, hint }: { label: string; children: ReactNode; h
   )
 }
 
-function RivalCard({ label, rival, tone, empty }: { label: string; rival: Rival | null; tone: string; empty: string }) {
+function RivalCard({
+  label,
+  rival,
+  tone,
+  empty,
+  suffix = 'contra',
+}: {
+  label: string
+  rival: Rival | null
+  tone: string
+  empty: string
+  suffix?: string
+}) {
   if (!rival) {
     return (
       <Card label={label}>
@@ -39,7 +52,7 @@ function RivalCard({ label, rival, tone, empty }: { label: string; rival: Rival 
   }
   const [name] = splitRiotId(rival.riotId)
   return (
-    <Card label={label} hint={`${rival.wins}V ${rival.losses}D contra`}>
+    <Card label={label} hint={`${rival.wins}V ${rival.losses}D ${suffix}`}>
       <div className="flex items-center gap-2">
         <SummonerIcon iconId={rival.iconId} size="xs" ring="dim" />
         <PlayerLink userId={rival.userId} className={`truncate font-display text-lg font-semibold leading-tight ${tone}`}>
@@ -52,12 +65,12 @@ function RivalCard({ label, rival, tone, empty }: { label: string; rival: Rival 
 
 // Estatísticas a mais do perfil: como capitão, sequências e adversários mais marcantes.
 export default function ProfileExtra({ extra }: { extra: ProfileExtraData }) {
-  const { captain, streaks, rivals } = extra
+  const { captain, streaks, rivals, duos } = extra
   const { current } = streaks
 
   return (
     <Panel title="Mais estatísticas" bodyClassName="p-3">
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Card
           label="Como capitão"
           hint={captain.games === 0 ? 'Nunca foi capitão' : `${captain.wins} vitória${captain.wins === 1 ? '' : 's'} em ${captain.games}`}
@@ -86,11 +99,22 @@ export default function ProfileExtra({ extra }: { extra: ProfileExtraData }) {
           </p>
         </Card>
 
+      </div>
+
+      {/* Com quem e contra quem: duos (mesmo time) e adversários (times opostos) */}
+      <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {duos && (
+          <>
+            <RivalCard label="Melhor duo" rival={duos.best} tone="text-hex-300" empty="Ninguém ainda" suffix="juntos" />
+            <RivalCard label="Pior duo" rival={duos.worst} tone="text-team-red" empty="Ninguém ainda" suffix="juntos" />
+          </>
+        )}
         <RivalCard label="Freguês" rival={rivals.victim} tone="text-hex-300" empty="Ninguém ainda" />
         <RivalCard label="Carrasco" rival={rivals.nemesis} tone="text-team-red" empty="Ninguém ainda" />
       </div>
       <p className="mt-2 px-1 text-xs text-ash-dim">
-        Freguês e carrasco precisam de pelo menos 2 partidas contra a pessoa e saldo de um lado só.
+        Duo é quem joga no mesmo time que você; freguês e carrasco, no time contrário. Precisam de pelo menos 2 partidas e
+        saldo de um lado só.
       </p>
     </Panel>
   )

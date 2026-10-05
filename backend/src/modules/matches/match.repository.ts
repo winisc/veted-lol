@@ -175,12 +175,22 @@ export const matchRepository = {
 
   // Contra quem o jogador já jogou (times opostos): vitórias e derrotas dele contra cada adversário.
   headToHead(userId: number): Rival[] {
+    return this.versus(userId, 'opposite')
+  },
+
+  // Com quem o jogador já jogou junto (mesmo time): vitórias e derrotas dele com cada parceiro.
+  withTeammates(userId: number): Rival[] {
+    return this.versus(userId, 'same')
+  },
+
+  versus(userId: number, relation: 'same' | 'opposite'): Rival[] {
+    const sideTest = relation === 'same' ? 'o.side = me.side AND o.user_id != me.user_id' : 'o.side != me.side'
     const rows = db
       .prepare(
         `SELECT o.user_id AS userId, u.game_name AS gameName, u.tag_line AS tagLine, u.profile_icon_id AS profileIconId,
                 SUM(me.result = 'win') AS wins, SUM(me.result = 'loss') AS losses
          FROM match_players me
-         JOIN match_players o ON o.match_id = me.match_id AND o.side != me.side
+         JOIN match_players o ON o.match_id = me.match_id AND ${sideTest}
          JOIN users u ON u.id = o.user_id
          WHERE me.user_id = ? AND me.result != 'remake'
          GROUP BY o.user_id`,
