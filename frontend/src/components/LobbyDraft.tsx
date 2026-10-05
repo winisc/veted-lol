@@ -100,13 +100,10 @@ export default function LobbyDraft({ lobby, skew, busy, onPick }: Props) {
                       onClick={myTurn ? () => onPick(player.id) : undefined}
                       disabled={busy}
                       highlight={player.isYou}
-                      fullName
-                      badges={
-                        <>
-                          {player.isYou && <YouBadge />}
-                          <RoleIcons roles={player.roles} />
-                        </>
-                      }
+                      stacked
+                      maxNameChars={12}
+                      badges={player.isYou && <YouBadge />}
+                      right={<RoleIcons roles={player.roles} />}
                     />
                   </li>
                 ))}

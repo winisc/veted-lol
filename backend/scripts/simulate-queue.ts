@@ -6,6 +6,7 @@
 //   npm run sim:queue -- --match-seconds=60  -> duração da partida antes de os bots a encerrarem (padrão 20)
 //   npm run sim:queue -- --clean       -> apaga as contas dos bots e as partidas de teste do histórico
 //
+// Os bots 3, 6 e 9 têm nick de 16 caracteres (inclusive um só de "W") para testar nicks longos nas telas.
 // O backend precisa estar rodando. Mantenha este script aberto: os bots saem da fila quando ele fecha (Ctrl+C).
 // No lobby, os bots votam em alguém aleatório e, se forem capitães, escolhem o lado e fazem os picks.
 // Na partida, encerram, votam no vencedor, no MVP e no bagre. Na tela final, topam a revanche depois que VOCÊ votar.
@@ -160,11 +161,17 @@ function onLobbyEvent(bot: Bot, lobby: LobbySnapshot | null) {
   }
 }
 
+// Alguns bots têm nick grande (16 caracteres, o máximo da Riot) para conferir como as telas lidam com nicks longos.
+// O terceiro é o pior caso: "W" é a letra mais larga.
+const LONG_NAMES = ['NomeBemGrandeBot', 'WWWWWWWWWWWWWWWW', 'MuitoMuitoGrande']
+const botName = (i: number) =>
+  i % 3 === 0 ? (LONG_NAMES[i / 3 - 1] ?? `Comprido${String(i).padStart(2, '0')}Bot`) : `Bot${String(i).padStart(2, '0')}`
+
 async function ensureBotUsers(): Promise<string[]> {
   const hash = await bcrypt.hash(PASSWORD, 10)
   const ids: string[] = []
   for (let i = 1; i <= count; i++) {
-    const riot = { gameName: `Bot${String(i).padStart(2, '0')}`, tagLine: TAG }
+    const riot = { gameName: botName(i), tagLine: TAG }
     const user = userRepository.findByRiotId(riot) ?? userRepository.create(riot, hash)
     // A fila exige as 3 roles no perfil: cada bot recebe roles diferentes (em rodízio).
     const order = ['top', 'jungle', 'mid', 'adc', 'support'] as const
