@@ -89,6 +89,14 @@ function Stat({ label, value, tone = 'text-gold-50' }: { label: string; value: s
   )
 }
 
+// Pontos da tabela depois de cada partida (remakes não mexem nos pontos e ficam de fora), do mais antigo ao
+// mais novo. Parte dos pontos de agora e volta no histórico (que vem do mais recente para o mais antigo).
+function pointsEvolution(history: ProfileResponse['history'], currentPoints: number): number[] {
+  const played = history.filter((m) => m.result !== 'remake').reverse()
+  let points = currentPoints - played.reduce((sum, m) => sum + m.points, 0)
+  return [points, ...played.map((m) => (points += m.points))]
+}
+
 export default function Profile() {
   // /perfil é o meu; /jogador/:id é o de outra pessoa (somente leitura).
   const { id } = useParams()
@@ -161,7 +169,7 @@ export default function Profile() {
         <ScoringRules scoring={scoring} className="mt-5 border-t border-rim pt-4" />
       </Panel>
 
-      {extra && <ProfileExtra extra={extra} />}
+      {extra && <ProfileExtra extra={extra} evolution={pointsEvolution(history, stats.points)} />}
 
       <Panel title={viewingOther ? 'Partidas recentes' : 'Histórico de partidas'} bodyClassName="p-3">
         {history.length === 0 ? (

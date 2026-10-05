@@ -63,14 +63,38 @@ function RivalCard({
   )
 }
 
+// Mini-gráfico de linha. `values` são os pontos da tabela depois de cada partida (do mais antigo ao mais novo).
+function Sparkline({ values, up }: { values: number[]; up: boolean }) {
+  const W = 100
+  const H = 32
+  const PAD = 3
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const x = (i: number) => (i / (values.length - 1)) * W
+  const y = (v: number) => H - PAD - ((v - min) / range) * (H - PAD * 2)
+  const line = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
+  const color = up ? 'var(--color-hex-300)' : 'var(--color-team-red)'
+  const last = values.length - 1
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-8 w-full overflow-visible" aria-hidden="true">
+      <polyline points={`0,${H} ${line} ${W},${H}`} fill={color} fillOpacity="0.12" stroke="none" />
+      <polyline points={line} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <circle cx={x(last)} cy={y(values[last])} r="2.2" fill={color} vectorEffect="non-scaling-stroke" />
+    </svg>
+  )
+}
+
 // Estatísticas a mais do perfil: como capitão, sequências e adversários mais marcantes.
-export default function ProfileExtra({ extra }: { extra: ProfileExtraData }) {
+export default function ProfileExtra({ extra, evolution }: { extra: ProfileExtraData; evolution?: number[] }) {
   const { captain, streaks, rivals, duos } = extra
   const { current } = streaks
+  const delta = evolution && evolution.length >= 3 ? evolution[evolution.length - 1] - evolution[0] : null
 
   return (
     <Panel title="Mais estatísticas" bodyClassName="p-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Card
           label="Como capitão"
           hint={captain.games === 0 ? 'Nunca foi capitão' : `${captain.wins} vitória${captain.wins === 1 ? '' : 's'} em ${captain.games}`}
@@ -99,10 +123,30 @@ export default function ProfileExtra({ extra }: { extra: ProfileExtraData }) {
           </p>
         </Card>
 
+        <Card
+          label="Evolução"
+          hint={delta === null || !evolution ? 'Precisa de 2 partidas' : `nas últimas ${evolution.length - 1} partidas`}
+        >
+          {delta !== null && evolution ? (
+            <div className="flex items-end gap-2">
+              <p
+                className={`font-cond text-3xl font-bold leading-none tabular-nums ${delta >= 0 ? 'text-hex-300' : 'text-team-red'}`}
+              >
+                {delta > 0 ? '+' : ''}
+                {delta}
+              </p>
+              <div className="min-w-0 flex-1">
+                <Sparkline values={evolution} up={delta >= 0} />
+              </div>
+            </div>
+          ) : (
+            <p className="font-cond text-3xl font-bold leading-none text-ash-dim">—</p>
+          )}
+        </Card>
       </div>
 
       {/* Com quem e contra quem: duos (mesmo time) e adversários (times opostos) */}
-      <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {duos && (
           <>
             <RivalCard label="Melhor duo" rival={duos.best} tone="text-hex-300" empty="Ninguém ainda" suffix="juntos" />
