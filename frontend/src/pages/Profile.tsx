@@ -6,6 +6,8 @@ import SummonerIcon from '../components/ui/SummonerIcon'
 import { CrownIcon, FishIcon, StarIcon } from '../components/ui/icons'
 import { Navigate, useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import ProfileExtra, { type ProfileExtraData } from '../components/ProfileExtra'
+import ProfileSeasons, { type SeasonResult } from '../components/ProfileSeasons'
+import SeasonCountdown from '../components/SeasonCountdown'
 import { useAuth } from '../context/AuthContext'
 import { useApi } from '../hooks/useApi'
 import { profileSplash } from '../lib/ddragon'
@@ -40,9 +42,12 @@ interface ProfileResponse {
     isMvp: boolean
     isBagre: boolean
     points: number
+    seasonId?: number
   }[]
   scoring: { win: number; loss: number; mvp: number; bagre: number }
   extra?: ProfileExtraData // ausente em servidores antigos
+  season?: { id: number; startsAt: string; endsAt: string; now: number } // season atual (ausente em servidores antigos)
+  seasons?: SeasonResult[]
 }
 
 // Cores do histórico como no LoL: vitória em ciano, derrota em vermelho.
@@ -113,7 +118,7 @@ export default function Profile() {
   if (loading) return <p className="text-ash">Carregando perfil...</p>
   if (error || !data) return <Notice>{error || 'Não foi possível carregar o perfil.'}</Notice>
 
-  const { user, stats, history, scoring, extra } = data
+  const { user, stats, history, scoring, extra, season, seasons } = data
   const [name, tag] = splitRiotId(user.riotId)
   const zone = stats.zone ? zones[stats.zone] : null
   const pointsTone = stats.points < 0 ? 'text-team-red' : 'text-gold-200'
@@ -142,7 +147,9 @@ export default function Profile() {
             {stats.rank && zone ? (
               <>
                 <p className={`font-cond text-5xl font-bold leading-none ${zone.text}`}>#{stats.rank}</p>
-                <p className="text-sm text-ash">de {stats.rankedPlayers} na tabela</p>
+                <p className="text-sm text-ash">
+                  de {stats.rankedPlayers} na tabela{season ? ` da season ${season.id}` : ''}
+                </p>
                 <span className={`bevel-sm px-3 py-1 text-sm font-bold ${zone.badge}`}>
                   {zone.symbol} {zone.label}
                 </span>
@@ -154,7 +161,10 @@ export default function Profile() {
         </div>
       </section>
 
-      <Panel title="Estatísticas">
+      <Panel
+        title={season ? `Estatísticas · Season ${season.id}` : 'Estatísticas'}
+        action={season && <SeasonCountdown key={season.endsAt} endsAt={season.endsAt} now={season.now} />}
+      >
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
           <WinRateRing value={stats.winRate} />
           <div className="grid w-full flex-1 grid-cols-3 gap-x-4 gap-y-5 md:grid-cols-6">
@@ -169,7 +179,14 @@ export default function Profile() {
         <ScoringRules scoring={scoring} className="mt-5 border-t border-rim pt-4" />
       </Panel>
 
-      {extra && <ProfileExtra extra={extra} evolution={pointsEvolution(history, stats.points)} />}
+      {extra && (
+        <ProfileExtra
+          extra={extra}
+          // Os pontos são da season atual: a curva só usa as partidas dela.
+          evolution={pointsEvolution(season ? history.filter((m) => m.seasonId === season.id) : history, stats.points)}
+        />
+      )}
+      {seasons && seasons.length > 0 && <ProfileSeasons seasons={seasons} />}
 
       <Panel title={viewingOther ? 'Partidas recentes' : 'Histórico de partidas'} bodyClassName="p-3">
         {history.length === 0 ? (

@@ -8,6 +8,7 @@ import PlayerLink from './ui/PlayerLink'
 import SummonerIcon from './ui/SummonerIcon'
 
 export interface RecentResult {
+  lobbyId?: string // lobby de onde veio (ausente em servidores antigos)
   matchId: string
   mode: QueueMode
   gameNumber: number

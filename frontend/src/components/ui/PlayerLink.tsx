@@ -9,10 +9,24 @@ export function useProfilePath() {
 }
 
 // Nome de jogador que leva ao perfil dele.
-export default function PlayerLink({ userId, children, className = '' }: { userId: number; children: ReactNode; className?: string }) {
+export default function PlayerLink({
+  userId,
+  children,
+  className = '',
+  newTab = false,
+}: {
+  userId: number
+  children: ReactNode
+  className?: string
+  newTab?: boolean // abre em outra aba (no lobby, para não sair da partida)
+}) {
   const path = useProfilePath()
   return (
-    <Link to={path(userId)} className={`hover:text-gold-200 hover:underline ${className}`}>
+    <Link
+      to={path(userId)}
+      {...(newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      className={`hover:text-gold-200 hover:underline ${className}`}
+    >
       {children}
     </Link>
   )

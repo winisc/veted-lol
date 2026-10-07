@@ -22,6 +22,7 @@ import type { Lobby, LobbyEvent, LobbyPhase, LobbyPlayer, LobbySnapshot, MatchOu
 import type { QueueMode } from '../../shared/types/modes'
 import { matchRepository } from '../matches/match.repository'
 import { getRanking } from '../ranking/ranking.service'
+import { seasonService } from '../seasons/season.service'
 import { userRepository } from '../users/user.repository'
 
 const timers = new Map<string, NodeJS.Timeout>()
@@ -32,6 +33,8 @@ const STATE_KEY = 'lobbies'
 const STATE_VERSION = 1
 // Depois de reiniciar, ninguém está conectado ainda: dá este tempo mínimo para as fases com prazo.
 const RESTORE_GRACE_MS = 8_000
+// Desloca as posições da season anterior para depois de qualquer posição da season atual (ver `seedPositions`).
+const SEED_OFFSET = 10_000
 registerPersistence(STATE_KEY, () => ({ version: STATE_VERSION, lobbies: lobbyRepository.all() }))
 
 const randomItem = <T>(items: T[]): T => items[Math.floor(Math.random() * items.length)]
@@ -115,7 +118,8 @@ function pickCaptains(lobby: Lobby): number[] {
 // Modo tabela: os mais bem colocados na tabela entre os jogadores do lobby viram capitães.
 // Quem ainda não tem posição (nunca jogou) fica por último; se precisar, as vagas são sorteadas entre eles.
 function pickCaptainsByRanking(lobby: Lobby): number[] {
-  const position = (id: number) => lobby.rankPositions.get(id) ?? Number.POSITIVE_INFINITY
+  const seeds = lobby.seedPositions ?? lobby.rankPositions
+  const position = (id: number) => seeds.get(id) ?? Number.POSITIVE_INFINITY
   return shuffle(lobby.players)
     .sort((a, b) => position(a.userId) - position(b.userId))
     .slice(0, lobbyConfig.captains)
@@ -237,6 +241,7 @@ function teamSummary(lobby: Lobby, side: Side) {
 // por alguns segundos depois do fim. Só em memória: some ao reiniciar o servidor.
 const RECENT_RESULT_MS = 15_000
 const recentResults: {
+  lobbyId: string
   matchId: string
   mode: QueueMode
   gameNumber: number
@@ -260,6 +265,7 @@ function finishMatch(lobby: Lobby) {
     matchRepository.save({
       id: lobby.matchId,
       mode: lobby.mode,
+      seasonId: seasonService.current().id,
       startedAt: lobby.startedAt ?? lobby.createdAt,
       endedAt: lobby.endedAt ?? Date.now(),
       outcome: lobby.outcome!,
@@ -285,6 +291,7 @@ function finishMatch(lobby: Lobby) {
     console.error('Falha ao salvar a partida no histórico:', err)
   }
   recentResults.unshift({
+    lobbyId: lobby.id,
     matchId: lobby.matchId,
     mode: lobby.mode,
     gameNumber: lobby.gameNumber,
@@ -346,6 +353,16 @@ export const lobbyService = {
     const rankPositions = new Map(
       players.map((p) => [p.userId, ranking.find((e) => e.userId === p.userId)?.position ?? null] as const),
     )
+    // Início de season: quase ninguém tem posição ainda. Para o modo tabela não virar sorteio puro, quem não jogou na
+    // season atual entra pela posição da anterior, atrás de todos os que já têm posição agora.
+    const previous = seasonService.previousPositions()
+    const seedPositions = new Map(
+      players.map((p) => {
+        const now = rankPositions.get(p.userId) ?? null
+        const before = previous.get(p.userId)
+        return [p.userId, now ?? (before !== undefined ? SEED_OFFSET + before : null)] as const
+      }),
+    )
 
     const roles = new Map(
       players.map((p) => [p.userId, userRepository.findById(p.userId)?.roles ?? { main: null, secondary: null, worst: null }] as const),
@@ -355,6 +372,7 @@ export const lobbyService = {
       id: randomUUID(),
       mode,
       rankPositions,
+      seedPositions,
       roles,
       players,
       phase: 'voting',
@@ -551,21 +569,28 @@ export const lobbyService = {
     cancelLobby(lobby, `${leaver?.riotId} saiu e o lobby foi cancelado.`, userId)
   },
 
-  // Partidas em andamento, para qualquer jogador logado acompanhar da tela inicial (só leitura).
-  // Junto vão as que acabaram de terminar, com o resumo final, por alguns segundos.
+  // Lobbies abertos em qualquer etapa (votação, draft, partida...), para qualquer jogador logado acompanhar
+  // da tela inicial (só leitura). Junto vão as que acabaram de terminar, com o resumo final, por alguns segundos.
   listLive() {
-    const matches = lobbyRepository
-      .all()
-      .filter(inMatch)
-      .map((lobby) => ({
-        id: lobby.id,
-        mode: lobby.mode,
-        phase: lobby.phase,
-        gameNumber: lobby.gameNumber,
-        startedAt: lobby.startedAt,
-        endedAt: lobby.endedAt,
-        teams: { blue: teamSummary(lobby, 'blue'), red: teamSummary(lobby, 'red') },
-      }))
+    const matches = lobbyRepository.all().map((lobby) => ({
+      id: lobby.id,
+      mode: lobby.mode,
+      phase: lobby.phase,
+      gameNumber: lobby.gameNumber,
+      startedAt: lobby.startedAt,
+      endedAt: lobby.endedAt,
+      players: lobby.players
+        .filter((p) => !lobby.left.has(p.userId))
+        .map((p) => ({
+          id: p.userId,
+          riotId: p.riotId,
+          iconId: p.iconId,
+          team: lobby.teams.blue.includes(p.userId) ? ('blue' as const) : lobby.teams.red.includes(p.userId) ? ('red' as const) : null,
+          isCaptain: lobby.captains.includes(p.userId),
+        })),
+      // Formato antigo (só quem já está em um time), para quem ainda roda o frontend anterior.
+      teams: { blue: teamSummary(lobby, 'blue'), red: teamSummary(lobby, 'red') },
+    }))
     return { matches, recent: recentResultsList() }
   },
 

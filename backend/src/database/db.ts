@@ -46,6 +46,28 @@ db.exec(`
     target_id INTEGER NOT NULL,
     PRIMARY KEY (match_id, kind, voter_id)
   );
+
+  -- Seasons semanais da tabela. A season 0 é a tabela antiga (tudo o que existia antes das seasons).
+  CREATE TABLE IF NOT EXISTS seasons (
+    id INTEGER PRIMARY KEY,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    closed INTEGER NOT NULL DEFAULT 0
+  );
+
+  -- Tabela final de cada season encerrada, congelada na hora em que ela fecha.
+  CREATE TABLE IF NOT EXISTS season_standings (
+    season_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    points INTEGER NOT NULL,
+    games INTEGER NOT NULL,
+    wins INTEGER NOT NULL,
+    losses INTEGER NOT NULL,
+    mvps INTEGER NOT NULL,
+    bagres INTEGER NOT NULL,
+    PRIMARY KEY (season_id, user_id)
+  );
 `)
 
 // Migrações simples para bancos criados antes de uma coluna existir.
@@ -76,6 +98,11 @@ if (!userColumns.some((c) => c.name === 'main_role')) {
 const playerColumns = db.prepare('PRAGMA table_info(match_players)').all() as { name: string }[]
 if (!playerColumns.some((c) => c.name === 'is_bagre')) {
   db.exec('ALTER TABLE match_players ADD COLUMN is_bagre INTEGER NOT NULL DEFAULT 0')
+}
+if (!matchColumns.some((c) => c.name === 'season_id')) {
+  // Season em que a partida contou. Sem valor = partida de antes das seasons (season 0).
+  db.exec('ALTER TABLE matches ADD COLUMN season_id INTEGER')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_matches_season ON matches (season_id)')
 }
 if (!playerColumns.some((c) => c.name === 'pick_order')) {
   // Draft: em que pick o jogador foi escolhido (1, 2, 3...) e por qual capitão. Capitães ficam sem valor.

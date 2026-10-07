@@ -1,6 +1,7 @@
 import type { LobbyPlayer, Side } from '../hooks/useLobby'
 import { sideStyle } from '../lib/teams'
 import { BagreBadge, CaptainBadge, MvpBadge, YouBadge } from './ui/Badges'
+import { useProfilePath } from './ui/PlayerLink'
 import PlayerRow from './ui/PlayerRow'
 import RoleIcons from './ui/RoleIcons'
 
@@ -16,6 +17,7 @@ interface Props {
 
 export default function TeamCard({ side, members, slots, mvpId, bagreId, winner, title }: Props) {
   const style = sideStyle[side]
+  const profilePath = useProfilePath()
   const rows = Array.from({ length: Math.max(slots ?? 0, members.length) }, (_, i) => members[i])
 
   return (
@@ -36,6 +38,8 @@ export default function TeamCard({ side, members, slots, mvpId, bagreId, winner,
                 iconId={member.iconId}
                 ring={member.id === mvpId ? 'gold' : member.id === bagreId ? 'bagre' : style.ring}
                 highlight={member.isYou}
+                to={profilePath(member.id)}
+                newTab
                 fullName
                 hideTag
                 right={<RoleIcons roles={member.roles} />}

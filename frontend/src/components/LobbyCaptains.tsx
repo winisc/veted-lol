@@ -2,6 +2,7 @@ import type { LobbyPlayer, LobbySnapshot } from '../hooks/useLobby'
 import { splitRiotId } from '../lib/teams'
 import PhaseTimer from './PhaseTimer'
 import { CrownMedal, YouBadge } from './ui/Badges'
+import PlayerLink from './ui/PlayerLink'
 import SectionTitle from './ui/SectionTitle'
 import SummonerIcon from './ui/SummonerIcon'
 
@@ -49,7 +50,11 @@ export default function LobbyCaptains({ lobby, skew }: { lobby: LobbySnapshot; s
               <div className="flex min-w-0 items-center gap-4">
                 <SummonerIcon iconId={captain.iconId} size="lg" ring="gold" badge={<CrownMedal />} />
                 <div className="min-w-0">
-                  <p className="truncate font-display text-2xl leading-tight text-gold-50">{name}</p>
+                  <p className="truncate font-display text-2xl leading-tight text-gold-50">
+                    <PlayerLink userId={captain.id} newTab>
+                      {name}
+                    </PlayerLink>
+                  </p>
                   <p className="text-sm text-ash">#{tag}</p>
                   <p className="flex items-center gap-2 font-cond text-base font-semibold text-gold-200">
                     {detail(captain)}
@@ -77,7 +82,11 @@ export default function LobbyCaptains({ lobby, skew }: { lobby: LobbySnapshot; s
               }`}
             >
               <SummonerIcon iconId={player.iconId} size="xs" ring="dim" />
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gold-50">{splitRiotId(player.riotId)[0]}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gold-50">
+                <PlayerLink userId={player.id} newTab>
+                  {splitRiotId(player.riotId)[0]}
+                </PlayerLink>
+              </span>
               <span className="font-cond text-sm font-semibold tabular-nums text-ash">{detail(player)}</span>
             </li>
           ))}

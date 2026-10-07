@@ -1,54 +1,45 @@
+import { AppError } from '../../shared/errors/AppError'
 import { matchRepository } from '../matches/match.repository'
-import { computePoints, scoring, winRate } from '../matches/match.scoring'
-import { resolveIconId } from '../../shared/utils/icons'
-import { formatRiotId } from '../../shared/utils/riotId'
-import { zoneFor, type Zone } from './ranking.zones'
+import { scoring } from '../matches/match.scoring'
+import { seasonRepository, type Season } from '../seasons/season.repository'
+import { seasonService } from '../seasons/season.service'
+import { buildRanking, type RankingEntry } from './ranking.builder'
 
-export interface RankingEntry {
-  position: number
-  zone: Zone
-  userId: number
-  riotId: string
-  iconId: number
-  points: number
-  games: number
-  wins: number
-  losses: number
-  winRate: number | null
-  mvps: number
-  bagres: number
+export type { RankingEntry }
+
+// Tabela de uma season. Sem argumento, a da season atual (calculada na hora); as encerradas vêm congeladas.
+export function getRanking(seasonId?: number): RankingEntry[] {
+  const current = seasonService.current()
+  const id = seasonId ?? current.id
+  return id === current.id ? buildRanking(matchRepository.rankingRows(id)) : seasonRepository.standings(id)
 }
 
-// Ordem: mais pontos, depois melhor win rate, mais vitórias, mais MVPs, menos bagres e, por fim, nome.
-export function getRanking(): RankingEntry[] {
-  return matchRepository
-    .rankingRows()
-    .map((row) => ({
-      userId: row.userId,
-      riotId: formatRiotId(row.gameName, row.tagLine),
-      iconId: resolveIconId(row.userId, row.profileIconId),
-      points: computePoints(row),
-      games: row.games,
-      wins: row.wins,
-      losses: row.losses,
-      winRate: winRate(row.wins, row.losses),
-      mvps: row.mvps,
-      bagres: row.bagres,
-    }))
-    .sort(
-      (a, b) =>
-        b.points - a.points ||
-        (b.winRate ?? -1) - (a.winRate ?? -1) ||
-        b.wins - a.wins ||
-        b.mvps - a.mvps ||
-        a.bagres - b.bagres ||
-        a.riotId.localeCompare(b.riotId),
-    )
-    .map((entry, i, all) => ({ position: i + 1, zone: zoneFor(i + 1, all.length), ...entry }))
-}
+const seasonInfo = (season: Season, currentId: number) => ({
+  id: season.id,
+  startsAt: season.startsAt,
+  endsAt: season.endsAt,
+  current: season.id === currentId,
+  legacy: season.id === 0, // a tabela antiga, de antes das seasons
+})
 
 export const rankingService = {
-  get() {
-    return { scoring, ranking: getRanking() }
+  // `seasonParam` vem da URL (?season=N); sem ele, a season atual.
+  get(seasonParam?: unknown) {
+    const current = seasonService.current()
+    let season: Season | null = current
+    if (seasonParam !== undefined && seasonParam !== '') {
+      const id = Number(seasonParam)
+      if (!Number.isInteger(id) || id < 0) throw new AppError('Season inválida.', 400)
+      season = id === current.id ? current : seasonRepository.findById(id)
+      if (!season) throw new AppError('Season não encontrada.', 404)
+    }
+
+    return {
+      scoring,
+      ranking: getRanking(season.id),
+      season: seasonInfo(season, current.id),
+      seasons: seasonService.list().map((s) => seasonInfo(s, current.id)),
+      now: Date.now(),
+    }
   },
 }

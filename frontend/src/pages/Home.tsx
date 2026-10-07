@@ -11,6 +11,7 @@ import { FishIcon, StarIcon } from "../components/ui/icons";
 import { useAuth } from "../context/AuthContext";
 import { useApi } from "../hooks/useApi";
 import { pageSplash } from "../lib/ddragon";
+import SeasonCountdown from "../components/SeasonCountdown";
 import { formatPercent } from "../lib/format";
 import { zones, type Zone } from "../lib/zones";
 
@@ -25,6 +26,8 @@ interface RankingEntry {
 
 interface RankingResponse {
   ranking: RankingEntry[];
+  season?: { id: number; endsAt: string };
+  now?: number;
 }
 
 type Result = "win" | "loss" | "remake";
@@ -246,7 +249,7 @@ function RecordBody({
   );
 }
 
-function TopRanking({ ranking }: { ranking?: RankingEntry[] }) {
+function TopRanking({ ranking, season, now }: { ranking?: RankingEntry[]; season?: { id: number; endsAt: string }; now?: number }) {
   const profilePath = useProfilePath();
   const { user } = useAuth();
   const top = ranking?.slice(0, 5) ?? [];
@@ -255,9 +258,12 @@ function TopRanking({ ranking }: { ranking?: RankingEntry[] }) {
     <Panel
       title="Topo da tabela"
       action={
-        <Link to="/tabela" className="text-sm text-gold-200 hover:text-gold-50">
-          Ver tabela
-        </Link>
+        <div className="flex items-center gap-3">
+          {season && now !== undefined && <SeasonCountdown key={season.endsAt} endsAt={season.endsAt} now={now} />}
+          <Link to="/tabela" className="text-sm text-gold-200 hover:text-gold-50">
+            Ver tabela
+          </Link>
+        </div>
       }
       bodyClassName="p-3"
     >
@@ -309,7 +315,8 @@ function TopRanking({ ranking }: { ranking?: RankingEntry[] }) {
 export default function Home() {
   const notice = (useLocation().state as { notice?: string } | null)?.notice;
   // Buscada uma vez e usada pelos dois cards.
-  const ranking = useApi<RankingResponse>("/ranking").data?.ranking;
+  const rankingData = useApi<RankingResponse>("/ranking").data;
+  const ranking = rankingData?.ranking;
 
   return (
     <div className="space-y-6">
@@ -330,7 +337,7 @@ export default function Home() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
         <MyRecord ranking={ranking} />
-        <TopRanking ranking={ranking} />
+        <TopRanking ranking={ranking} season={rankingData?.season} now={rankingData?.now} />
       </div>
 
       <Panel title="Como funciona uma partida">

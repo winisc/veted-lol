@@ -5,9 +5,12 @@ import { matchRepository } from '../matches/match.repository'
 import type { Rival } from '../matches/match.types'
 import { computePoints, matchPoints, scoring, winRate } from '../matches/match.scoring'
 import { getRanking } from '../ranking/ranking.service'
+import { seasonRepository } from '../seasons/season.repository'
+import { seasonService } from '../seasons/season.service'
 import { userRepository } from '../users/user.repository'
 
 const HISTORY_LIMIT = 20
+const SEASONS_SHOWN = 12 // a atual e as mais recentes encerradas
 
 // Sequências de resultados (do mais recente para o mais antigo, sem remakes).
 function streaks(results: ('win' | 'loss')[]) {
@@ -64,9 +67,26 @@ export const profileService = {
     const user = userRepository.findById(userId)
     if (!user) throw new AppError('Usuário não encontrado.', 404)
 
-    const stats = matchRepository.statsForUser(userId)
-    const ranking = getRanking()
+    // Pontos, posição e números do perfil são da season atual; a posição em cada season vem em `seasons`.
+    const season = seasonService.current()
+    const stats = matchRepository.statsForUser(userId, season.id)
+    const ranking = getRanking(season.id)
     const entry = ranking.find((e) => e.userId === userId)
+    const seasons = seasonService.list().slice(0, SEASONS_SHOWN).map((s) => {
+      const row = s.id === season.id ? entry : seasonRepository.standings(s.id).find((e) => e.userId === userId)
+      return {
+        id: s.id,
+        current: s.id === season.id,
+        legacy: s.id === 0,
+        startsAt: s.startsAt,
+        endsAt: s.endsAt,
+        position: row?.position ?? null, // null: não jogou nessa season
+        zone: row?.zone ?? null,
+        points: row?.points ?? null,
+        games: row?.games ?? null,
+        rankedPlayers: s.id === season.id ? ranking.length : seasonRepository.standings(s.id).length,
+      }
+    })
     const captain = matchRepository.captainStats(userId)
 
     return {
@@ -89,6 +109,8 @@ export const profileService = {
         zone: entry?.zone ?? null,
         rankedPlayers: ranking.length,
       },
+      season: { id: season.id, startsAt: season.startsAt, endsAt: season.endsAt, now: Date.now() },
+      seasons,
       extra: {
         captain: {
           ...captain,

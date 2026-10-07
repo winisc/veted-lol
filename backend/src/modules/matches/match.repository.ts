@@ -4,7 +4,7 @@ import { formatRiotId } from '../../shared/utils/riotId'
 import type { AdminMatch, AdminMatchPlayerRow, MatchDetail, MatchVote, PlayerResult, Rival, HistoryRow, MatchOutcome, NewMatch, PlayerStats, RankingRow } from './match.types'
 
 const insertMatch = db.prepare(
-  'INSERT INTO matches (id, mode, started_at, ended_at, duration_seconds, outcome, mvp_user_id, bagre_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  'INSERT INTO matches (id, mode, season_id, started_at, ended_at, duration_seconds, outcome, mvp_user_id, bagre_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
 )
 const insertPlayer = db.prepare(
   'INSERT INTO match_players (match_id, user_id, side, is_captain, result, is_mvp, is_bagre, pick_order, picked_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -17,6 +17,7 @@ const saveTransaction = db.transaction((match: NewMatch) => {
   insertMatch.run(
     match.id,
     match.mode,
+    match.seasonId,
     new Date(match.startedAt).toISOString(),
     new Date(match.endedAt).toISOString(),
     durationSeconds,
@@ -47,25 +48,25 @@ export const matchRepository = {
     saveTransaction(match)
   },
 
-  // Remakes não contam como jogo nem como vitória/derrota.
-  statsForUser(userId: number): PlayerStats {
+  // Remakes não contam como jogo nem como vitória/derrota. Com `seasonId`, só as partidas dessa season.
+  statsForUser(userId: number, seasonId?: number): PlayerStats {
     const row = db
       .prepare(
         `SELECT
            COUNT(*) AS games,
-           COALESCE(SUM(result = 'win'), 0) AS wins,
-           COALESCE(SUM(result = 'loss'), 0) AS losses,
-           COALESCE(SUM(is_mvp), 0) AS mvps,
-           COALESCE(SUM(is_bagre), 0) AS bagres
-         FROM match_players
-         WHERE user_id = ? AND result != 'remake'`,
+           COALESCE(SUM(mp.result = 'win'), 0) AS wins,
+           COALESCE(SUM(mp.result = 'loss'), 0) AS losses,
+           COALESCE(SUM(mp.is_mvp), 0) AS mvps,
+           COALESCE(SUM(mp.is_bagre), 0) AS bagres
+         FROM match_players mp JOIN matches m ON m.id = mp.match_id
+         WHERE mp.user_id = ? AND mp.result != 'remake' AND (? IS NULL OR COALESCE(m.season_id, 0) = ?)`,
       )
-      .get(userId) as PlayerStats
+      .get(userId, seasonId ?? null, seasonId ?? null) as PlayerStats
     return row
   },
 
-  // Todos os jogadores com pelo menos uma partida válida (sem remakes).
-  rankingRows(): RankingRow[] {
+  // Todos os jogadores com pelo menos uma partida válida (sem remakes). Com `seasonId`, só as dessa season.
+  rankingRows(seasonId?: number): RankingRow[] {
     const rows = db
       .prepare(
         `SELECT
@@ -76,11 +77,12 @@ export const matchRepository = {
            SUM(mp.is_mvp) AS mvps,
            SUM(mp.is_bagre) AS bagres
          FROM match_players mp
+         JOIN matches m ON m.id = mp.match_id
          JOIN users u ON u.id = mp.user_id
-         WHERE mp.result != 'remake'
+         WHERE mp.result != 'remake' AND (? IS NULL OR COALESCE(m.season_id, 0) = ?)
          GROUP BY u.id`,
       )
-      .all() as RankingRow[]
+      .all(seasonId ?? null, seasonId ?? null) as RankingRow[]
     return rows
   },
 
@@ -91,7 +93,7 @@ export const matchRepository = {
         `SELECT
            m.id AS matchId, m.ended_at AS endedAt, m.duration_seconds AS durationSeconds,
            mp.side AS side, mp.result AS result, mp.is_captain AS isCaptain, mp.is_mvp AS isMvp,
-           mp.is_bagre AS isBagre
+           mp.is_bagre AS isBagre, COALESCE(m.season_id, 0) AS seasonId
          FROM match_players mp
          JOIN matches m ON m.id = mp.match_id
          WHERE mp.user_id = ?

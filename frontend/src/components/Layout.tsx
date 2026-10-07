@@ -82,10 +82,13 @@ function LayoutContent() {
 
   // A fila encheu: leva o jogador para o lobby de onde ele estiver (ex.: olhando a tabela).
   // Só reage à mudança para "matched"; quem sai do lobby e volta para a aba Jogar não é redirecionado.
+  // Ao abrir o site já dentro de um lobby, só leva para ele se a página for o início: um perfil aberto em
+  // outra aba (link do lobby) precisa continuar aberto.
   const previousStatus = useRef<string | undefined>(undefined)
   useEffect(() => {
     const status = snapshot?.status
-    if (status === 'matched' && previousStatus.current !== 'matched' && pathname !== '/lobby') {
+    const firstLoad = previousStatus.current === undefined
+    if (status === 'matched' && previousStatus.current !== 'matched' && pathname !== '/lobby' && (!firstLoad || pathname === '/')) {
       navigate('/lobby')
     }
     previousStatus.current = status

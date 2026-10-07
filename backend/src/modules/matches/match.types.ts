@@ -14,6 +14,7 @@ export interface MatchVote {
 export interface NewMatch {
   id: string
   mode: QueueMode
+  seasonId: number // season em que a partida conta
   startedAt: number
   endedAt: number
   outcome: MatchOutcome
@@ -48,6 +49,7 @@ export interface HistoryRow {
   isCaptain: boolean
   isMvp: boolean
   isBagre: boolean
+  seasonId: number
 }
 
 // ---- Detalhe da partida e estatísticas ----

@@ -36,7 +36,10 @@ export interface Pick {
 export interface Lobby {
   id: string
   mode: QueueMode // vote: capitães por votação · ranked: os 2 melhores da tabela
-  rankPositions: Map<number, number | null> // posição de cada jogador na tabela quando o lobby abriu
+  rankPositions: Map<number, number | null> // posição de cada jogador na tabela (season atual) quando o lobby abriu
+  // Posição usada só para escolher os capitães no modo tabela: quem ainda não jogou na season atual entra pela
+  // posição da season anterior, depois de todo mundo que já tem posição. Ausente em lobbies guardados antes disso.
+  seedPositions?: Map<number, number | null>
   roles: Map<number, PlayerRoles> // roles de cada jogador (do perfil) quando o lobby abriu
   players: LobbyPlayer[]
   phase: LobbyPhase

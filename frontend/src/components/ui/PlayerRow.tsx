@@ -14,6 +14,7 @@ interface Props {
   right?: ReactNode // canto direito
   onClick?: () => void // vira botão (ex.: pick no draft)
   to?: string // vira link (ex.: perfil do jogador)
+  newTab?: boolean // com `to`: abre em outra aba
   fullName?: boolean // linha de altura fixa que dá prioridade ao nick inteiro (nunca quebra de linha)
   hideTag?: boolean // com fullName: esconde a #TAG para sobrar espaço ao nick
   stacked?: boolean // cartão de duas linhas e altura fixa: nick (e etiquetas) em cima; #TAG e o canto direito embaixo
@@ -34,6 +35,7 @@ export default function PlayerRow({
   right,
   onClick,
   to,
+  newTab,
   fullName,
   hideTag,
   stacked,
@@ -77,7 +79,11 @@ export default function PlayerRow({
 
   if (to) {
     return (
-      <Link to={to} title={riotId} className={`${classes} transition-colors hover:border-gold-200/60 hover:bg-rim`}>
+      <Link
+        to={to}
+        title={riotId}
+        {...(newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+        className={`${classes} transition-colors hover:border-gold-200/60 hover:bg-rim`}>
         {body}
       </Link>
     )

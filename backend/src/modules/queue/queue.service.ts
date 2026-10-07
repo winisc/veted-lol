@@ -84,7 +84,9 @@ function snapshot(userId: number, notice?: string, dropped?: QueueSnapshot['drop
     mode,
     size: mode ? sizes[mode] : 0,
     players: mode
-      ? queueRepository.list(mode).map((p) => ({ riotId: p.riotId, iconId: p.iconId, isYou: p.userId === userId }))
+      ? queueRepository
+          .list(mode)
+          .map((p) => ({ userId: p.userId, riotId: p.riotId, iconId: p.iconId, isYou: p.userId === userId }))
       : [],
   }
 }

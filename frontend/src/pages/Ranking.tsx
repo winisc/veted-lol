@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { YouBadge } from "../components/ui/Badges";
 import Notice from "../components/ui/Notice";
 import PageHero from "../components/ui/PageHero";
@@ -9,7 +9,8 @@ import { CrownIcon, FishIcon, StarIcon } from "../components/ui/icons";
 import { useAuth } from "../context/AuthContext";
 import { useApi } from "../hooks/useApi";
 import { pageSplash } from "../lib/ddragon";
-import { formatPercent } from "../lib/format";
+import SeasonCountdown from "../components/SeasonCountdown";
+import { formatDate, formatPercent } from "../lib/format";
 import { splitRiotId } from "../lib/teams";
 import { zoneOrder, zones, type Zone } from "../lib/zones";
 
@@ -28,10 +29,23 @@ interface RankingEntry {
   bagres: number;
 }
 
+interface SeasonInfo {
+  id: number;
+  startsAt: string;
+  endsAt: string;
+  current: boolean;
+  legacy: boolean; // a tabela antiga, de antes das seasons
+}
+
 interface RankingResponse {
   scoring: { win: number; loss: number; mvp: number; bagre: number };
   ranking: RankingEntry[];
+  season?: SeasonInfo; // ausente em servidores antigos
+  seasons?: SeasonInfo[];
+  now?: number;
 }
+
+const seasonLabel = (s: SeasonInfo) => (s.legacy ? "Tabela antiga" : `Season ${s.id}`);
 
 const COLUMNS = 9;
 
@@ -207,14 +221,18 @@ function AwardLeaders({ ranking, myId }: { ranking: RankingEntry[]; myId?: numbe
 
 export default function Ranking() {
   const { user } = useAuth();
-  const { data, error, loading } = useApi<RankingResponse>("/ranking");
+  // null = a season atual. Ao trocar, a tabela anterior continua na tela até a nova chegar.
+  const [seasonId, setSeasonId] = useState<number | null>(null);
+  const { data, error, loading } = useApi<RankingResponse>(seasonId === null ? "/ranking" : `/ranking?season=${seasonId}`);
 
-  if (loading) return <p className="text-ash">Carregando tabela...</p>;
+  if (loading && !data) return <p className="text-ash">Carregando tabela...</p>;
   if (error || !data)
     return <Notice>{error || "Não foi possível carregar a tabela."}</Notice>;
 
-  const { ranking, scoring } = data;
+  const { ranking, scoring, season, seasons } = data;
   const mine = ranking.find((entry) => entry.userId === user?.id);
+  // Season encerrada: tabela congelada, só para consulta.
+  const past = season !== undefined && !season.current;
 
   return (
     <div className="space-y-6">
@@ -229,23 +247,67 @@ export default function Ranking() {
               <span
                 className={`block font-semibold ${zones[mine.zone].text}`}
               >
-                Você está em #{mine.position} com {mine.points} pontos:{" "}
+                {past ? "Você terminou" : "Você está"} em #{mine.position} com {mine.points} pontos:{" "}
                 {zones[mine.zone].label}.
               </span>
             ) : (
               <span className="block">
-                Você ainda não está na tabela. Jogue uma partida para entrar.
+                {past
+                  ? "Você não jogou nesta season."
+                  : "Você ainda não está na tabela. Jogue uma partida para entrar."}
               </span>
             )}
           </>
         }
       >
+        {season && data.now !== undefined && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded bg-rim px-2 py-0.5 text-xs font-semibold text-gold-50">{seasonLabel(season)}</span>
+            {season.current ? (
+              <SeasonCountdown key={season.endsAt} endsAt={season.endsAt} now={data.now} />
+            ) : (
+              <span className="text-xs text-ash">
+                {season.legacy
+                  ? `Tudo o que foi jogado até ${formatDate(season.endsAt)}`
+                  : `${formatDate(season.startsAt)} a ${formatDate(season.endsAt)} · encerrada`}
+              </span>
+            )}
+          </div>
+        )}
         <ScoringRules scoring={scoring} className="mt-2" />
       </PageHero>
 
+      {/* Seasons: a atual e as encerradas (tabela final guardada) */}
+      {seasons && seasons.length > 1 && (
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Seasons">
+          {seasons.map((s) => {
+            const active = (season?.id ?? seasons[0].id) === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setSeasonId(s.current ? null : s.id)}
+                className={`rounded-md border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  active
+                    ? "border-gold-200 bg-gold-200/15 text-gold-50"
+                    : "border-rim bg-abyss text-ash hover:border-ash-dim hover:text-gold-50"
+                }`}
+              >
+                {seasonLabel(s)}
+                {s.current && <span className="ml-1.5 text-xs font-normal text-hex-300">atual</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {ranking.length === 0 ? (
         <p className="border border-dashed border-rim px-4 py-12 text-center text-ash">
-          Ninguém jogou ainda. A tabela aparece depois da primeira partida.
+          {past
+            ? "Ninguém jogou nesta season."
+            : "Ninguém jogou nesta season ainda. A tabela aparece depois da primeira partida."}
         </p>
       ) : (
         <>

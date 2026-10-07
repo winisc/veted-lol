@@ -4,6 +4,7 @@ import { queueModeOrder, queueModes, type QueueMode } from '../lib/modes'
 import { formatDuration, splitRiotId } from '../lib/teams'
 import HexButton, { HexLink } from './ui/HexButton'
 import Notice from './ui/Notice'
+import PlayerLink from './ui/PlayerLink'
 import SummonerIcon from './ui/SummonerIcon'
 
 // As 10 vagas da partida: ícone de quem já entrou, círculo vazio para quem falta.
@@ -15,10 +16,22 @@ function QueueSlots({ snapshot }: { snapshot: QueueSnapshot }) {
       {slots.map((player, i) =>
         player ? (
           <li key={player.riotId} className="flex min-w-0 flex-col items-center gap-1.5" title={player.riotId}>
-            <SummonerIcon iconId={player.iconId} size="md" ring={player.isYou ? 'gold' : 'cyan'} glow={player.isYou} />
-            <span className={`w-full truncate text-center text-xs ${player.isYou ? 'font-semibold text-gold-50' : 'text-ash'}`}>
-              {splitRiotId(player.riotId)[0]}
-            </span>
+            {player.userId !== undefined ? (
+              // Clicar no jogador abre o perfil dele.
+              <PlayerLink userId={player.userId} className="flex w-full min-w-0 flex-col items-center gap-1.5 no-underline hover:no-underline">
+                <SummonerIcon iconId={player.iconId} size="md" ring={player.isYou ? 'gold' : 'cyan'} glow={player.isYou} />
+                <span className={`w-full truncate text-center text-xs ${player.isYou ? 'font-semibold text-gold-50' : 'text-ash'}`}>
+                  {splitRiotId(player.riotId)[0]}
+                </span>
+              </PlayerLink>
+            ) : (
+              <>
+                <SummonerIcon iconId={player.iconId} size="md" ring={player.isYou ? 'gold' : 'cyan'} glow={player.isYou} />
+                <span className={`w-full truncate text-center text-xs ${player.isYou ? 'font-semibold text-gold-50' : 'text-ash'}`}>
+                  {splitRiotId(player.riotId)[0]}
+                </span>
+              </>
+            )}
           </li>
         ) : (
           <li key={`empty-${i}`} className="flex flex-col items-center gap-1.5">

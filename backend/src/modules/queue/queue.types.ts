@@ -31,7 +31,7 @@ export interface QueueSnapshot {
   size: number // jogadores esperando na fila do modo do jogador (0 se não está em fila)
   sizes: Record<QueueMode, number> // quantos esperam em cada fila (para os botões de entrar)
   required: number
-  players: { riotId: string; iconId: number; isYou: boolean }[]
+  players: { userId: number; riotId: string; iconId: number; isYou: boolean }[]
   readyCheck: {
     endsAt: number
     durationMs: number
