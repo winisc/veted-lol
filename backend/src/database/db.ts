@@ -99,6 +99,15 @@ const playerColumns = db.prepare('PRAGMA table_info(match_players)').all() as { 
 if (!playerColumns.some((c) => c.name === 'is_bagre')) {
   db.exec('ALTER TABLE match_players ADD COLUMN is_bagre INTEGER NOT NULL DEFAULT 0')
 }
+if (!userColumns.some((c) => c.name === 'puuid')) {
+  // Identificador da conta na Riot, guardado na primeira consulta de elo (evita buscar a conta toda vez).
+  db.exec('ALTER TABLE users ADD COLUMN puuid TEXT')
+}
+if (!userColumns.some((c) => c.name === 'sim_elo')) {
+  // Elo simulado, só para os bots do simulador (npm run sim:queue): JSON do elo, ou 'none' para "sem rank".
+  // Quem tem isso preenchido não é consultado na Riot. Jogadores de verdade nunca têm.
+  db.exec('ALTER TABLE users ADD COLUMN sim_elo TEXT')
+}
 if (!matchColumns.some((c) => c.name === 'season_id')) {
   // Season em que a partida contou. Sem valor = partida de antes das seasons (season 0).
   db.exec('ALTER TABLE matches ADD COLUMN season_id INTEGER')

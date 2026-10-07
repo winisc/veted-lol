@@ -9,8 +9,8 @@ export const lobbyConfig = {
   orderMs: seconds('LOBBY_ORDER_SECONDS', 20), // modo tabela: o 2º colocado escolhe pickar primeiro ou segundo
   pickMs: seconds('LOBBY_PICK_SECONDS', 30), // tempo para cada pick
   doneMs: seconds('LOBBY_DONE_SECONDS', 5), // tela do draft finalizado, antes da partida começar
-  mvpMs: seconds('LOBBY_MVP_SECONDS', 60), // votação de MVP
-  bagreMs: seconds('LOBBY_BAGRE_SECONDS', 60), // votação do bagre (o pior da partida)
+  mvpMs: seconds('LOBBY_MVP_SECONDS', 30), // votação de MVP
+  bagreMs: seconds('LOBBY_BAGRE_SECONDS', 30), // votação do bagre (o pior da partida)
   rematchMs: seconds('LOBBY_REMATCH_SECONDS', 5), // aviso de troca de lados antes da revanche
 
   captains: 2,

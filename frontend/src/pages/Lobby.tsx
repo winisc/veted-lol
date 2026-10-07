@@ -11,11 +11,14 @@ import LobbyRematch from '../components/LobbyRematch'
 import LobbyResult from '../components/LobbyResult'
 import LobbySide from '../components/LobbySide'
 import LobbyVoting from '../components/LobbyVoting'
+import { ReactionBar, ReactionFeed } from '../components/Reactions'
+import { ReactionsContext } from '../lib/reactions'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import HexButton from '../components/ui/HexButton'
 import Notice from '../components/ui/Notice'
 import { useQueue } from '../context/QueueContext'
 import { useLobby, type LobbyPhase } from '../hooks/useLobby'
+import { useLobbySounds } from '../hooks/useLobbySounds'
 import { pageSplash } from '../lib/ddragon'
 import { queueModes } from '../lib/modes'
 
@@ -75,10 +78,12 @@ export default function Lobby() {
     voteResult,
     voteMvp,
     voteBagre,
-    voteRematch,
     leave,
+    reactions,
+    react,
   } = useLobby()
   const navigate = useNavigate()
+  useLobbySounds(lobby, skew)
   const queue = useQueue()
   const [confirmingLeave, setConfirmingLeave] = useState(false)
 
@@ -150,27 +155,37 @@ export default function Lobby() {
       {error && <Notice>{error}</Notice>}
       {!connected && <Notice tone="warning">Conexão perdida. Reconectando...</Notice>}
 
-      <section className="rounded-xl border border-rim bg-abyss p-4 sm:px-5">
-        {/* A key muda a cada fase, então o conteúdo novo entra com animação (só na troca de fase, não a cada voto/pick). */}
-        <div key={lobby.phase === 'done' ? 'picking' : lobby.phase} className="animate-phase-in">
-          {lobby.phase === 'voting' && <LobbyVoting lobby={lobby} skew={skew} busy={busy} onVote={vote} />}
-          {lobby.phase === 'captains' && <LobbyCaptains lobby={lobby} skew={skew} />}
-          {lobby.phase === 'coinflip' && <LobbyCoinFlip lobby={lobby} skew={skew} />}
-          {lobby.phase === 'order' && <LobbyOrder lobby={lobby} skew={skew} busy={busy} onChoose={chooseOrder} />}
-          {lobby.phase === 'side' && <LobbySide lobby={lobby} skew={skew} busy={busy} onChoose={chooseSide} />}
-          {(lobby.phase === 'picking' || lobby.phase === 'done') && (
-            <LobbyDraft lobby={lobby} skew={skew} busy={busy} onPick={pick} />
-          )}
-          {lobby.phase === 'playing' && <LobbyPlaying lobby={lobby} skew={skew} busy={busy} onVoteEnd={voteEnd} />}
-          {lobby.phase === 'result' && <LobbyResult lobby={lobby} skew={skew} busy={busy} onVote={voteResult} />}
-          {lobby.phase === 'mvp' && <LobbyAwardVote kind="mvp" lobby={lobby} skew={skew} busy={busy} onVote={voteMvp} />}
-          {lobby.phase === 'bagre' && (
-            <LobbyAwardVote kind="bagre" lobby={lobby} skew={skew} busy={busy} onVote={voteBagre} />
-          )}
-          {finished && <LobbyFinished lobby={lobby} skew={skew} busy={busy || queue.busy} onRematch={voteRematch} onRequeue={requeue} />}
-          {rematching && <LobbyRematch lobby={lobby} skew={skew} />}
-        </div>
-      </section>
+      <ReactionsContext.Provider value={reactions}>
+        <section className="rounded-xl border border-rim bg-abyss p-4 sm:px-5">
+          {/* A key muda a cada fase, então o conteúdo novo entra com animação (só na troca de fase, não a cada voto/pick). */}
+          <div key={lobby.phase === 'done' ? 'picking' : lobby.phase} className="animate-phase-in">
+            {lobby.phase === 'voting' && <LobbyVoting lobby={lobby} skew={skew} busy={busy} onVote={vote} />}
+            {lobby.phase === 'captains' && <LobbyCaptains lobby={lobby} skew={skew} />}
+            {lobby.phase === 'coinflip' && <LobbyCoinFlip lobby={lobby} skew={skew} />}
+            {lobby.phase === 'order' && <LobbyOrder lobby={lobby} skew={skew} busy={busy} onChoose={chooseOrder} />}
+            {lobby.phase === 'side' && <LobbySide lobby={lobby} skew={skew} busy={busy} onChoose={chooseSide} />}
+            {(lobby.phase === 'picking' || lobby.phase === 'done') && (
+              <LobbyDraft lobby={lobby} skew={skew} busy={busy} onPick={pick} />
+            )}
+            {lobby.phase === 'playing' && <LobbyPlaying lobby={lobby} skew={skew} busy={busy} onVoteEnd={voteEnd} />}
+            {lobby.phase === 'result' && <LobbyResult lobby={lobby} skew={skew} busy={busy} onVote={voteResult} />}
+            {lobby.phase === 'mvp' && <LobbyAwardVote kind="mvp" lobby={lobby} skew={skew} busy={busy} onVote={voteMvp} />}
+            {lobby.phase === 'bagre' && (
+              <LobbyAwardVote kind="bagre" lobby={lobby} skew={skew} busy={busy} onVote={voteBagre} />
+            )}
+            {finished && <LobbyFinished lobby={lobby} skew={skew} busy={busy || queue.busy} onRequeue={requeue} onLeave={leave} />}
+            {rematching && <LobbyRematch lobby={lobby} skew={skew} />}
+          </div>
+        </section>
+
+        {/* Reações rápidas (só no draft): aparecem por cima do ícone de quem mandou e no canto da tela */}
+        {(lobby.phase === 'picking' || lobby.phase === 'done') && (
+          <div className="flex justify-center">
+            <ReactionBar onReact={react} />
+          </div>
+        )}
+        <ReactionFeed items={reactions} players={lobby.players} />
+      </ReactionsContext.Provider>
 
       <ConfirmDialog
         open={confirmingLeave}

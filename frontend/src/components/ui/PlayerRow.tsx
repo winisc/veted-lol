@@ -10,6 +10,7 @@ interface Props {
   size?: IconSize
   highlight?: boolean
   leading?: ReactNode // antes do ícone (ex.: posição na tabela)
+  iconBadge?: ReactNode // por cima do ícone, embaixo no meio (como o nível no ícone do LoL)
   badges?: ReactNode // na mesma linha do nome
   right?: ReactNode // canto direito
   onClick?: () => void // vira botão (ex.: pick no draft)
@@ -18,6 +19,7 @@ interface Props {
   fullName?: boolean // linha de altura fixa que dá prioridade ao nick inteiro (nunca quebra de linha)
   hideTag?: boolean // com fullName: esconde a #TAG para sobrar espaço ao nick
   stacked?: boolean // cartão de duas linhas e altura fixa: nick (e etiquetas) em cima; #TAG e o canto direito embaixo
+  meta?: ReactNode // com stacked: no lugar da #TAG, na linha de baixo (ex.: o elo do jogador)
   maxNameChars?: number // corta o nick com "..." depois desse tanto de letras (o nick inteiro fica no tooltip)
   disabled?: boolean
   className?: string
@@ -31,6 +33,7 @@ export default function PlayerRow({
   size = 'sm',
   highlight,
   leading,
+  iconBadge,
   badges,
   right,
   onClick,
@@ -39,6 +42,7 @@ export default function PlayerRow({
   fullName,
   hideTag,
   stacked,
+  meta,
   maxNameChars,
   disabled,
   className = '',
@@ -52,7 +56,14 @@ export default function PlayerRow({
   const body = (
     <>
       {leading && <div className="shrink-0">{leading}</div>}
-      <SummonerIcon iconId={iconId} size={size} ring={ring} />
+      {iconBadge ? (
+        <span className="relative shrink-0">
+          <SummonerIcon iconId={iconId} size={size} ring={ring} />
+          <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2">{iconBadge}</span>
+        </span>
+      ) : (
+        <SummonerIcon iconId={iconId} size={size} ring={ring} />
+      )}
       {stacked ? (
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-1.5">
@@ -60,7 +71,7 @@ export default function PlayerRow({
             {badges && <span className="flex shrink-0 items-center gap-1">{badges}</span>}
           </span>
           <span className="flex min-w-0 items-center gap-2">
-            <span className="min-w-0 truncate text-xs leading-5 text-ash">#{tag}</span>
+            {meta ?? <span className="min-w-0 truncate text-xs leading-5 text-ash">#{tag}</span>}
             {right && <span className="shrink-0">{right}</span>}
           </span>
         </div>

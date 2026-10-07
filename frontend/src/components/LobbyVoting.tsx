@@ -3,6 +3,8 @@ import type { LobbyPlayer, LobbySnapshot } from '../hooks/useLobby'
 import { splitRiotId } from '../lib/teams'
 import PhaseTimer from './PhaseTimer'
 import { YouBadge } from './ui/Badges'
+import EloBadge from './ui/EloBadge'
+import RankBadge from './ui/RankBadge'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { CheckIcon } from './ui/icons'
 import PlayerTile from './ui/PlayerTile'
@@ -59,8 +61,10 @@ export default function LobbyVoting({ lobby, skew, busy, onVote }: Props) {
                 onClick={voted ? undefined : () => setPending(player)}
                 disabled={busy}
                 footer={
-                  (player.isYou || selected) && (
+                  (player.isYou || selected || player.rankPosition != null || player.elo) && (
                     <>
+                      <RankBadge position={player.rankPosition} />
+                      <EloBadge elo={player.elo} compact />
                       {player.isYou && <YouBadge />}
                       {selected && <span className="text-xs font-semibold text-gold-200">Seu voto</span>}
                     </>

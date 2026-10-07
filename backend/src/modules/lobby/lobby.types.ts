@@ -1,5 +1,6 @@
 import type { QueueMode } from '../../shared/types/modes'
 import type { PlayerRoles } from '../../shared/types/roles'
+import type { PlayerElo } from '../riot/elo.service'
 import type { MatchOutcome, Side } from '../matches/match.types'
 
 export type { MatchOutcome, Side }
@@ -32,12 +33,14 @@ export interface Pick {
   playerId: number
   byId: number // capitão que escolheu
   order: number // 1, 2, 3...
+  auto?: boolean // o último jogador restante, que entrou sozinho no time de quem estava escolhendo
 }
 
 export interface Lobby {
   id: string
   mode: QueueMode // vote: capitães por votação · ranked: os 2 melhores da tabela
   rankPositions: Map<number, number | null> // posição de cada jogador na tabela (season atual) quando o lobby abriu
+  rankPoints?: Map<number, number | null> // pontos de cada jogador na season atual (para a chance estimada de vitória)
   // Posição usada só para escolher os capitães no modo tabela: quem ainda não jogou na season atual entra pela
   // posição da season anterior, depois de todo mundo que já tem posição. Ausente em lobbies guardados antes disso.
   seedPositions?: Map<number, number | null>
@@ -128,7 +131,9 @@ export interface LobbySnapshot {
     isCaptain: boolean
     team: Side | null
     rankPosition: number | null // posição na tabela (null = ainda sem partidas)
+    rankPoints: number | null // pontos na season atual (null = ainda sem partidas)
     roles: PlayerRoles
+    elo: PlayerElo | null // elo do LoL (null = sem rank, ou a Riot não respondeu)
   }[]
   myVote: number | null
   votedCount: number
@@ -137,7 +142,15 @@ export interface LobbySnapshot {
   match: MatchSnapshot
 }
 
+// Reação rápida de um jogador (emoji ou frase pronta), mostrada por alguns segundos para todo o lobby.
+export interface LobbyReaction {
+  id: string
+  userId: number
+  reaction: string // um dos ids de REACTIONS (lobby.service)
+}
+
 export interface LobbyEvent {
   lobby: LobbySnapshot | null
   notice?: string
+  reaction?: LobbyReaction
 }

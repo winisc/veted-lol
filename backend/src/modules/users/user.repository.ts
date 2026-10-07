@@ -14,6 +14,8 @@ interface UserRow {
   main_role: string | null
   secondary_role: string | null
   worst_role: string | null
+  puuid: string | null
+  sim_elo: string | null
   created_at: string // 'YYYY-MM-DD HH:MM:SS' em UTC
 }
 
@@ -38,6 +40,8 @@ function toUser(row: UserRow): User {
     iconId: resolveIconId(row.id, row.profile_icon_id),
     isAdmin: row.is_admin === 1 || envAdmins().has(riotId),
     createdAt: `${row.created_at.replace(' ', 'T')}Z`,
+    puuid: row.puuid,
+    simElo: row.sim_elo,
     roles: {
       main: isRole(row.main_role) ? row.main_role : null,
       secondary: isRole(row.secondary_role) ? row.secondary_role : null,
@@ -83,6 +87,15 @@ export const userRepository = {
   // Admin pelo .env não pode ser removido pela tela (só tirando do .env).
   isEnvAdmin(user: User) {
     return envAdmins().has(`${user.gameName}#${user.tagLine}`.toLowerCase())
+  },
+
+  // Só para o simulador: dá um elo falso ao bot (null/'none' = sem rank).
+  setSimElo(userId: number, elo: object | null) {
+    db.prepare('UPDATE users SET sim_elo = ? WHERE id = ?').run(elo ? JSON.stringify(elo) : 'none', userId)
+  },
+
+  setPuuid(userId: number, puuid: string) {
+    db.prepare('UPDATE users SET puuid = ? WHERE id = ?').run(puuid, userId)
   },
 
   setRoles(userId: number, roles: PlayerRoles) {

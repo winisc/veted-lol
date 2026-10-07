@@ -57,13 +57,12 @@ interface QueuedViewProps {
   snapshot: QueueSnapshot
   busy: boolean
   onLeave: () => void
-  onSwitch: (mode: QueueMode) => void
+  onStandby: (mode: QueueMode) => void
 }
 
-function QueuedView({ snapshot, busy, onLeave, onSwitch }: QueuedViewProps) {
+function QueuedView({ snapshot, busy, onLeave, onStandby }: QueuedViewProps) {
   const elapsed = useElapsedSeconds()
   const mode = snapshot.mode ?? 'vote'
-  const other: QueueMode = mode === 'vote' ? 'ranked' : 'vote'
 
   return (
     <div className="space-y-6">
@@ -109,14 +108,19 @@ function QueuedView({ snapshot, busy, onLeave, onSwitch }: QueuedViewProps) {
         <HexButton variant="secondary" onClick={onLeave} disabled={busy}>
           Sair da fila
         </HexButton>
-        <button
-          type="button"
-          onClick={() => onSwitch(other)}
-          disabled={busy}
-          className="text-sm text-ash transition-colors hover:text-gold-50 disabled:opacity-50"
-        >
-          Trocar para o {queueModes[other].name.toLowerCase()} ({snapshot.sizes?.[other] ?? 0}/{snapshot.required})
-        </button>
+        {snapshot.standbyMax !== undefined && (
+          <button
+            type="button"
+            onClick={() => onStandby(mode)}
+            disabled={busy || (snapshot.standbySizes?.[mode] ?? 0) >= snapshot.standbyMax}
+            title="Sai da fila e vai para a lista de espera deste modo, para ver a fila e entrar de novo quando chegar a sua vez"
+            className="text-sm text-ash transition-colors hover:text-gold-50 disabled:opacity-50"
+          >
+            {(snapshot.standbySizes?.[mode] ?? 0) >= snapshot.standbyMax
+              ? 'Lista de espera cheia'
+              : `Ir para a lista de espera (${snapshot.standbySizes?.[mode] ?? 0}/${snapshot.standbyMax})`}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -270,7 +274,7 @@ export default function QueuePanel() {
       {snapshot?.status === 'standby' && <StandbyView snapshot={snapshot} busy={busy} onJoin={promote} onLeave={leave} />}
 
       {snapshot?.status === 'queued' && (
-        <QueuedView snapshot={snapshot} busy={busy} onLeave={leave} onSwitch={join} />
+        <QueuedView snapshot={snapshot} busy={busy} onLeave={leave} onStandby={joinStandby} />
       )}
 
       {snapshot?.status === 'ready_check' && (

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useQueue, type DroppedPlayer } from '../context/QueueContext'
+import { sfx } from '../lib/sfx'
 import { splitRiotId } from '../lib/teams'
 import SummonerIcon from './ui/SummonerIcon'
 
@@ -17,6 +18,11 @@ export default function DroppedToast() {
   const { dropped, clearDropped } = useQueue()
 
   // A cada aviso novo o relógio recomeça.
+  // Som uma vez por aviso novo (não a cada atualização da fila).
+  useEffect(() => {
+    if (dropped) sfx.declined()
+  }, [dropped])
+
   useEffect(() => {
     if (!dropped) return
     const timer = setTimeout(clearDropped, VISIBLE_MS)

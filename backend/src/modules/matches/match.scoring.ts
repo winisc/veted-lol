@@ -2,7 +2,7 @@ import { LEGACY_SEASON_ID } from '../seasons/season.constants'
 
 // Sistema de pontuação do ranking. Os pontos são calculados a partir do histórico de cada season.
 // Remake não vale nada. A pontuação mudou na primeira season semanal: a tabela antiga (até a season 6) continua
-// valendo -15 por derrota e +5 de MVP; da season 7 em diante a derrota vale -17 e o MVP +3. Para mudar de novo só nas seasons futuras,
+// valendo -15 por derrota e +5 de MVP; da season 7 em diante a derrota vale -17, o MVP +3 e o bagre -3 (antes, -2). Para mudar de novo só nas seasons futuras,
 // crie outro conjunto abaixo e escolha em `scoringFor`.
 export interface Scoring {
   win: number
@@ -12,7 +12,7 @@ export interface Scoring {
 }
 
 const legacyScoring: Scoring = { win: 25, loss: -15, mvp: 5, bagre: -2 }
-export const scoring: Scoring = { win: 25, loss: -17, mvp: 3, bagre: -2 }
+export const scoring: Scoring = { win: 25, loss: -17, mvp: 3, bagre: -3 }
 
 // Pontuação que valia na season (e continua valendo para as tabelas já encerradas).
 export function scoringFor(seasonId: number): Scoring {

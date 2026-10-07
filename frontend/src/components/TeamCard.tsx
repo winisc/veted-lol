@@ -2,7 +2,10 @@ import type { LobbyPlayer, Side } from '../hooks/useLobby'
 import { sideStyle } from '../lib/teams'
 import { BagreBadge, CaptainBadge, MvpBadge, YouBadge } from './ui/Badges'
 import { useProfilePath } from './ui/PlayerLink'
+import { ReactionBubble } from './Reactions'
 import PlayerRow from './ui/PlayerRow'
+import RankBadge from './ui/RankBadge'
+import EloBadge from './ui/EloBadge'
 import RoleIcons from './ui/RoleIcons'
 
 interface Props {
@@ -32,7 +35,8 @@ export default function TeamCard({ side, members, slots, mvpId, bagreId, winner,
       <ul className="space-y-1 p-1.5">
         {rows.map((member, i) =>
           member ? (
-            <li key={member.id}>
+            <li key={member.id} className="relative">
+              <ReactionBubble userId={member.id} />
               <PlayerRow
                 riotId={member.riotId}
                 iconId={member.iconId}
@@ -42,9 +46,11 @@ export default function TeamCard({ side, members, slots, mvpId, bagreId, winner,
                 newTab
                 fullName
                 hideTag
+                iconBadge={<RankBadge position={member.rankPosition} overlay />}
                 right={<RoleIcons roles={member.roles} />}
                 badges={
                   <>
+                    <EloBadge elo={member.elo} compact />
                     {member.isCaptain && <CaptainBadge />}
                     {member.id === mvpId && <MvpBadge />}
                     {member.id === bagreId && <BagreBadge />}

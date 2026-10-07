@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { notifyEnabled, notifyState, requestNotifyPermission, setNotifyEnabled, type NotifyState } from '../lib/notify'
+import { getSfxVolume, setSfxVolume, sfx } from '../lib/sfx'
 import { FOUND_SOUND_URL, getQueueVolume, setQueueVolume } from '../lib/sound'
 import ConfirmDialog from './ui/ConfirmDialog'
 import HexButton from './ui/HexButton'
@@ -124,6 +125,7 @@ export default function SettingsModal() {
 
   // Notificações do navegador (a permissão é do navegador; o interruptor é nosso).
   const [notifyOn, setNotifyOn] = useState(notifyEnabled)
+  const [sfxVolume, setSfxVolumeState] = useState(getSfxVolume)
   const [permission, setPermission] = useState<NotifyState>(notifyState)
 
   // Troca de senha
@@ -296,6 +298,54 @@ export default function SettingsModal() {
                 </button>
               </div>
               <p className="mt-2 text-xs text-ash">Toca quando a fila fecha, até você aceitar.</p>
+            </section>
+
+            <section className="border-t border-rim pt-4">
+              <p className="flex items-center justify-between text-sm font-semibold text-gold-50">
+                Efeitos sonoros
+                <span className="font-cond text-base tabular-nums text-gold-200">
+                  {sfxVolume === 0 ? 'Mudo' : `${Math.round(sfxVolume * 100)}%`}
+                </span>
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = sfxVolume === 0 ? 0.5 : 0
+                    setSfxVolumeState(next)
+                    setSfxVolume(next)
+                  }}
+                  aria-label={sfxVolume === 0 ? 'Ativar efeitos' : 'Silenciar efeitos'}
+                  title={sfxVolume === 0 ? 'Ativar efeitos' : 'Silenciar efeitos'}
+                  className="text-ash hover:text-gold-50"
+                >
+                  <SpeakerIcon muted={sfxVolume === 0} />
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={Math.round(sfxVolume * 100)}
+                  onChange={(e) => {
+                    const next = Number(e.target.value) / 100
+                    setSfxVolumeState(next)
+                    setSfxVolume(next)
+                  }}
+                  aria-label="Volume dos efeitos"
+                  className="h-1.5 flex-1 cursor-pointer accent-gold-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => sfx.choose('mvp')}
+                  disabled={sfxVolume === 0}
+                  className="flex w-24 items-center justify-center gap-1.5 rounded-md border border-rim bg-panel px-3 py-1 text-sm font-semibold text-gold-50 transition-colors hover:border-ash-dim disabled:opacity-50"
+                >
+                  <PlayIcon />
+                  Testar
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-ash">Sons do lobby e do fim de partida (contagem, picks, MVP e bagre).</p>
             </section>
 
             <section className="border-t border-rim pt-4">

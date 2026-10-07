@@ -3,7 +3,11 @@ import { short, sideStyle, teamMembers } from '../lib/teams'
 import PhaseTimer from './PhaseTimer'
 import TeamCard from './TeamCard'
 import { YouBadge } from './ui/Badges'
+import { ReactionBubble } from './Reactions'
+import WinChanceBar from './WinChanceBar'
 import PlayerRow from './ui/PlayerRow'
+import RankBadge from './ui/RankBadge'
+import EloBadge from './ui/EloBadge'
 import RoleIcons from './ui/RoleIcons'
 import SummonerIcon from './ui/SummonerIcon'
 
@@ -81,6 +85,8 @@ export default function LobbyDraft({ lobby, skew, busy, onPick }: Props) {
         />
       </div>
 
+      <WinChanceBar lobby={lobby} />
+
       <div className="grid items-start gap-3 lg:grid-cols-[1fr_1.1fr_1fr]">
         <TeamCard side="blue" members={teamMembers(lobby, 'blue')} slots={TEAM_SIZE} />
 
@@ -92,7 +98,8 @@ export default function LobbyDraft({ lobby, skew, busy, onPick }: Props) {
               </h3>
               <ul className="grid grid-cols-2 gap-1">
                 {pool.map((player) => (
-                  <li key={player.id}>
+                  <li key={player.id} className="relative">
+                    <ReactionBubble userId={player.id} />
                     <PlayerRow
                       riotId={player.riotId}
                       iconId={player.iconId}
@@ -101,6 +108,10 @@ export default function LobbyDraft({ lobby, skew, busy, onPick }: Props) {
                       disabled={busy}
                       highlight={player.isYou}
                       stacked
+                      // O elo (selo compacto, cabe com as 3 roles) entra no lugar da #TAG; o nick com a tag e o elo por extenso ficam no tooltip.
+                      // A posição na tabela fica por cima do ícone.
+                      meta={player.elo ? <EloBadge elo={player.elo} compact /> : undefined}
+                      iconBadge={<RankBadge position={player.rankPosition} overlay />}
                       maxNameChars={12}
                       badges={player.isYou && <YouBadge />}
                       right={<RoleIcons roles={player.roles} />}
@@ -125,6 +136,7 @@ export default function LobbyDraft({ lobby, skew, busy, onPick }: Props) {
                       <span className="min-w-0 truncate">
                         <span className="text-gold-50">{short(captain)}</span> escolheu{' '}
                         <span className="text-gold-50">{short(picked)}</span>
+                        {pk.auto && <span className="text-ash-dim"> (último restante)</span>}
                       </span>
                     </li>
                   )

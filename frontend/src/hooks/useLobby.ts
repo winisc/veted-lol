@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { ShownReaction } from '../lib/reactions'
+import type { PlayerElo } from '../lib/elo'
 import type { PlayerRoles } from '../lib/roles'
 import { API_BASE, api, tokenStorage } from '../lib/api'
 import type { QueueMode } from '../lib/modes'
@@ -30,13 +32,16 @@ export interface LobbyPlayer {
   isCaptain: boolean
   team: Side | null
   rankPosition: number | null // posição na tabela quando o lobby abriu (null = sem partidas)
+  rankPoints?: number | null // pontos na season atual (null = sem partidas; ausente em servidores antigos)
   roles?: PlayerRoles // roles do perfil (ausente em servidores antigos)
+  elo?: PlayerElo | null // elo do LoL (null = sem rank; ausente em servidores antigos)
 }
 
 export interface Pick {
   playerId: number
   byId: number
   order: number
+  auto?: boolean // o último restante, que entrou sozinho no time
 }
 
 export interface DraftSnapshot {
@@ -94,7 +99,10 @@ export interface LobbySnapshot {
 interface LobbyEvent {
   lobby: LobbySnapshot | null
   notice?: string
+  reaction?: ShownReaction
 }
+
+const REACTION_MS = 3500 // quanto tempo cada reação fica na tela
 
 interface LobbyState {
   lobby: LobbySnapshot | null | undefined // undefined = ainda carregando, null = sem lobby
@@ -107,6 +115,7 @@ export function useLobby() {
   const [connected, setConnected] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [reactions, setReactions] = useState<ShownReaction[]>([])
 
   useEffect(() => {
     const token = tokenStorage.get()
@@ -119,6 +128,12 @@ export function useLobby() {
       const data = JSON.parse(event.data) as LobbyEvent
       setConnected(true)
       setState({ lobby: data.lobby, notice: data.notice, skew: data.lobby ? data.lobby.now - Date.now() : 0 })
+      // Reação de alguém do lobby: fica alguns segundos na tela e some sozinha.
+      const reaction = data.reaction
+      if (reaction) {
+        setReactions((list) => [...list.slice(-7), reaction])
+        window.setTimeout(() => setReactions((list) => list.filter((r) => r.id !== reaction.id)), REACTION_MS)
+      }
     }
 
     return () => source.close()
@@ -146,6 +161,14 @@ export function useLobby() {
   const voteResult = useCallback((choice: MatchOutcome) => act('/lobby/result', { choice }), [act])
   const voteMvp = useCallback((targetId: number) => act('/lobby/mvp', { targetId }), [act])
   const voteBagre = useCallback((targetId: number) => act('/lobby/bagre', { targetId }), [act])
+  // Reação rápida: sem "carregando" nem mensagem de erro (se vier rápido demais, só não aparece).
+  const react = useCallback(async (reaction: string) => {
+    try {
+      await api('/lobby/react', { body: { reaction } })
+    } catch {
+      // ignorado
+    }
+  }, [])
   const voteRematch = useCallback((value: boolean) => act('/lobby/rematch', { vote: value }), [act])
 
   // Devolve se conseguiu sair (para quem quer emendar outra ação, como entrar na fila de novo).
@@ -178,5 +201,7 @@ export function useLobby() {
     voteBagre,
     voteRematch,
     leave,
+    reactions,
+    react,
   }
 }

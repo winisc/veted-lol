@@ -21,11 +21,17 @@ import {
 import type { Lobby, LobbyEvent, LobbyPhase, LobbyPlayer, LobbySnapshot, MatchOutcome, Side } from './lobby.types'
 import type { QueueMode } from '../../shared/types/modes'
 import { matchRepository } from '../matches/match.repository'
+import { eloService } from '../riot/elo.service'
 import { getRanking } from '../ranking/ranking.service'
 import { seasonService } from '../seasons/season.service'
 import { userRepository } from '../users/user.repository'
 
 const timers = new Map<string, NodeJS.Timeout>()
+
+// Reações rápidas do lobby: só estas (o texto/emoji de cada uma fica no frontend). Uma por jogador a cada 1,5s.
+const REACTIONS = new Set(['gg', 'bora', 'fire', 'laugh', 'rage', 'bagre', 'carry', 'f'])
+const REACTION_COOLDOWN_MS = 1500
+const lastReactionAt = new Map<number, number>()
 
 // Os lobbies são guardados no banco a cada mudança, para sobreviver a um reinício do servidor.
 // Mude STATE_VERSION quando o formato do Lobby mudar: estados guardados com outra versão são descartados.
@@ -178,13 +184,20 @@ function applySide(lobby: Lobby, side: Side) {
   setPhase(lobby, 'picking', lobbyConfig.pickMs, () => autoPick(lobby))
 }
 
-function applyPick(lobby: Lobby, playerId: number) {
+function applyPick(lobby: Lobby, playerId: number, auto = false) {
   const byId = lobby.pickOrder[lobby.pickIndex]
   const side: Side = lobby.sides.blue === byId ? 'blue' : 'red'
 
   lobby.teams[side].push(playerId)
-  lobby.picks.push({ playerId, byId, order: lobby.pickIndex + 1 })
+  lobby.picks.push(auto ? { playerId, byId, order: lobby.pickIndex + 1, auto: true } : { playerId, byId, order: lobby.pickIndex + 1 })
   lobby.pickIndex++
+
+  // Sobrou um só jogador: não há o que escolher, ele já vai para o time de quem pica agora.
+  const pool = draftPool(lobby)
+  if (lobby.pickIndex < lobby.pickOrder.length && pool.length === 1) {
+    applyPick(lobby, pool[0].userId, true)
+    return
+  }
 
   if (lobby.pickIndex >= lobby.pickOrder.length) setPhase(lobby, 'done', lobbyConfig.doneMs, () => startPlaying(lobby))
   else setPhase(lobby, 'picking', lobbyConfig.pickMs, () => autoPick(lobby))
@@ -370,6 +383,9 @@ export const lobbyService = {
     const rankPositions = new Map(
       players.map((p) => [p.userId, ranking.find((e) => e.userId === p.userId)?.position ?? null] as const),
     )
+    const rankPoints = new Map(
+      players.map((p) => [p.userId, ranking.find((e) => e.userId === p.userId)?.points ?? null] as const),
+    )
     // Início de season: quase ninguém tem posição ainda. Para o modo tabela não virar sorteio puro, quem não jogou na
     // season atual entra pela posição da anterior, atrás de todos os que já têm posição agora.
     const previous = seasonService.previousPositions()
@@ -389,6 +405,7 @@ export const lobbyService = {
       id: randomUUID(),
       mode,
       rankPositions,
+      rankPoints,
       seedPositions,
       roles,
       players,
@@ -420,6 +437,10 @@ export const lobbyService = {
       createdAt: Date.now(),
     }
     lobbyRepository.create(lobby)
+    // Elo do LoL de quem ainda não foi buscado (a maioria já veio ao entrar na fila). Chegando, atualiza a tela de todos.
+    void eloService.refresh(players.map((p) => p.userId)).then((changed) => {
+      if (changed && lobbyRepository.findById(lobby.id)) broadcast(lobby)
+    })
 
     if (mode === 'ranked') {
       // Sem votação: capitães pela tabela e já mostra o resultado antes do sorteio.
@@ -449,6 +470,24 @@ export const lobbyService = {
     if (lobby.votes.size === lobby.players.length) finishVoting(lobby)
     else broadcast(lobby)
 
+    return snapshotFor(lobby, userId)
+  },
+
+  // Reação rápida (emoji ou frase pronta): vai para todos do lobby, que mostram por alguns segundos.
+  react(userId: number, reaction: unknown): LobbySnapshot {
+    const lobby = requireLobby(userId)
+    if (typeof reaction !== 'string' || !REACTIONS.has(reaction)) throw new AppError('Reação inválida.', 400)
+    // Reações só durante o draft.
+    if (lobby.phase !== 'picking' && lobby.phase !== 'done') throw new AppError('Reações só durante o draft.', 409)
+    const now = Date.now()
+    if (now - (lastReactionAt.get(userId) ?? 0) < REACTION_COOLDOWN_MS) throw new AppError('Calma! Uma reação por vez.', 429)
+    lastReactionAt.set(userId, now)
+
+    const event = { id: randomUUID(), userId, reaction }
+    for (const player of lobby.players) {
+      if (lobby.left.has(player.userId)) continue
+      sendTo(player.userId, { lobby: snapshotFor(lobby, player.userId), reaction: event })
+    }
     return snapshotFor(lobby, userId)
   },
 

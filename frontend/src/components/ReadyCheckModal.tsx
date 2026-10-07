@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQueue } from '../context/QueueContext'
 import { queueModes } from '../lib/modes'
 import { showMatchFound } from '../lib/notify'
+import { sfx } from '../lib/sfx'
 import { FOUND_SOUND_URL, getQueueVolume } from '../lib/sound'
 import HexButton from './ui/HexButton'
 import { CheckIcon } from './ui/icons'
@@ -36,6 +37,15 @@ export default function ReadyCheckModal() {
       document.title = original
     }
   }, [Boolean(check)])
+
+  // Um "tic" a cada pessoa que aceita (a contagem subindo).
+  const acceptedCount = check?.accepted ?? 0
+  const [lastAccepted, setLastAccepted] = useState(acceptedCount)
+  useEffect(() => {
+    if (acceptedCount > lastAccepted) sfx.accepted()
+    setLastAccepted(acceptedCount)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acceptedCount])
 
   // Notificação do navegador enquanto o jogador ainda não respondeu (só se a aba não estiver à vista).
   const ringing = Boolean(check) && !check?.iAccepted

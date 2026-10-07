@@ -2,6 +2,7 @@ import { useElapsed } from '../hooks/useElapsed'
 import type { LobbySnapshot } from '../hooks/useLobby'
 import { formatDuration, teamMembers } from '../lib/teams'
 import TeamCard from './TeamCard'
+import WinChanceBar from './WinChanceBar'
 import HexButton from './ui/HexButton'
 
 interface Props {
@@ -28,6 +29,8 @@ export default function LobbyPlaying({ lobby, skew, busy, onVoteEnd }: Props) {
           {formatDuration(elapsed)}
         </p>
       </div>
+
+      <WinChanceBar lobby={lobby} />
 
       <div className="grid items-start gap-3 md:grid-cols-[1fr_auto_1fr]">
         <TeamCard side="blue" members={teamMembers(lobby, 'blue')} />

@@ -7,6 +7,7 @@ import { QUEUE_MODES, isQueueMode, type QueueMode } from '../../shared/types/mod
 import { formatRiotId } from '../../shared/utils/riotId'
 import { lobbyRepository } from '../lobby/lobby.repository'
 import { lobbyService } from '../lobby/lobby.service'
+import { eloService } from '../riot/elo.service'
 import { userRepository } from '../users/user.repository'
 import { queueEvents } from './queue.events'
 import { queueRepository } from './queue.repository'
@@ -251,6 +252,7 @@ export const queueService = {
 
       if (current) queueRepository.remove(userId)
       queueRepository.add(mode, { userId, riotId: formatRiotId(user.gameName, user.tagLine), iconId: user.iconId })
+      eloService.warm(userId) // em segundo plano: o elo já estará pronto quando o draft abrir
       startReadyChecks(mode)
       broadcast()
     }
@@ -273,11 +275,11 @@ export const queueService = {
   },
 
   // Entra na lista de espera de um modo: fica fora da fila, vendo a fila atual, na ordem de chegada.
+  // Quem está na fila também pode ir para a espera: sai da fila e entra no fim da lista (se houver vaga nela).
   joinStandby(userId: number, mode: unknown): QueueSnapshot {
     if (!isQueueMode(mode)) throw new AppError('Modo de fila inválido.', 400)
     if (lobbyRepository.findByUser(userId)) throw new AppError('Você já está em um lobby.', 409)
     if (queueRepository.findReadyCheck(userId)) throw new AppError('Você está numa confirmação de partida.', 409)
-    if (queueRepository.isWaiting(userId)) throw new AppError('Você já está na fila. Saia dela antes de ir para a espera.', 409)
 
     const current = queueRepository.standbyModeOf(userId)
     if (current === mode) return snapshot(userId) // já está nessa espera
@@ -294,6 +296,7 @@ export const queueService = {
     }
 
     if (current) queueRepository.removeStandby(userId) // troca de espera: vai para o fim da outra
+    queueRepository.remove(userId) // veio da fila: sai dela (só depois de saber que há vaga na espera)
     queueRepository.addStandby(mode, { userId, riotId: formatRiotId(user.gameName, user.tagLine), iconId: user.iconId })
     broadcast()
     return snapshot(userId)

@@ -150,6 +150,268 @@
   animation: drain 8s linear forwards;
 }
 
+/* Fim de jogo: entrada do MVP (estrela que gira, cresce e solta um anel de brilho) e do bagre (peixe que entra
+   nadando da esquerda, com bolhas). Depois da animação, o cartão revela quem levou. --award-delay escalona os dois. */
+.award-reveal {
+  animation: award-reveal 0.45s ease-out both;
+  animation-delay: calc(var(--award-delay, 0ms) + 1800ms);
+}
+
+@keyframes award-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.award-star {
+  animation: award-star 2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--award-delay, 0ms);
+}
+
+@keyframes award-star {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-200deg);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.35) rotate(15deg);
+  }
+  65% {
+    transform: scale(1) rotate(0deg);
+  }
+  85% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+.award-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  animation: award-ring 1.3s ease-out both;
+  animation-delay: calc(var(--award-delay, 0ms) + 600ms);
+}
+
+@keyframes award-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(0.2);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+/* Revelação depois do holofote: o nick escolhido entra deslizando
+   da lateral (com tranco e brilho), o ícone dá um flash e os votos aparecem logo depois. */
+/* Durante o voo do escolhido: os outros candidatos se apagam no lugar e o rótulo entra suave (sem pular). */
+.award-ghost {
+  animation: award-ghost 0.5s ease-out both;
+}
+
+@keyframes award-ghost {
+  from {
+    opacity: 0.3;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+.award-label-in {
+  animation: award-label-in 0.4s ease-out both;
+}
+
+@keyframes award-label-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Revelação: o bloco final já entra visível (o atraso da entrada ficou no holofote). */
+.award-reveal-now {
+  animation: award-reveal 0.25s ease-out both;
+}
+
+.award-name-land {
+  animation: award-name 0.6s cubic-bezier(0.22, 1.45, 0.36, 1) both;
+}
+
+@keyframes award-name {
+  0% {
+    opacity: 0;
+    transform: translateX(-56px);
+    filter: blur(6px);
+  }
+  55% {
+    opacity: 1;
+    filter: blur(0);
+    text-shadow: 0 0 18px rgb(255 255 255 / 0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    text-shadow: none;
+  }
+}
+
+.award-icon-land {
+  animation: award-icon 0.5s ease-out both;
+}
+
+@keyframes award-icon {
+  from {
+    filter: brightness(2.4);
+    transform: scale(1.15);
+  }
+  to {
+    filter: none;
+    transform: none;
+  }
+}
+
+.award-votes-land {
+  animation: award-reveal 0.4s ease-out both;
+  animation-delay: 350ms;
+}
+
+/* O desenho do peixe olha para a esquerda: scaleX(-1) vira para a direita, o lado para onde ele nada. */
+.award-fish {
+  animation: award-fish 2s ease-in-out both;
+  animation-delay: var(--award-delay, 0ms);
+}
+
+@keyframes award-fish {
+  0% {
+    opacity: 0;
+    transform: translateX(-90px) scaleX(-1);
+  }
+  15% {
+    opacity: 1;
+  }
+  35% {
+    transform: translateX(-45px) translateY(-4px) rotate(-10deg) scaleX(-1);
+  }
+  55% {
+    transform: translateX(-12px) translateY(3px) rotate(8deg) scaleX(-1);
+  }
+  70% {
+    transform: translateX(0) rotate(-4deg) scaleX(-1);
+  }
+  85% {
+    opacity: 1;
+    transform: translateX(0) scale(1.1) scaleX(-1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(4px) scale(0.5) scaleX(-1);
+  }
+}
+
+.award-bubble {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  border: 1.5px solid currentColor;
+  opacity: 0;
+  animation: award-bubble 1.4s ease-out both;
+}
+
+.award-bubble-1 {
+  right: 6px;
+  top: 18px;
+  animation-delay: calc(var(--award-delay, 0ms) + 700ms);
+}
+
+.award-bubble-2 {
+  right: 14px;
+  top: 24px;
+  width: 4px;
+  height: 4px;
+  animation-delay: calc(var(--award-delay, 0ms) + 1000ms);
+}
+
+@keyframes award-bubble {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.6);
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-22px) scale(1.1);
+  }
+}
+
+/* Reações rápidas: o balão "salta" por cima do ícone; no canto, cada linha entra deslizando. */
+.reaction-pop {
+  animation: reaction-pop 3.5s ease-out both;
+}
+
+@keyframes reaction-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.4);
+  }
+  8% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.25);
+  }
+  15% {
+    transform: translateY(0) scale(1);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.reaction-feed {
+  animation: reaction-feed 3.5s ease-out both;
+}
+
+@keyframes reaction-feed {
+  0% {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  8%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* Moeda do sorteio dos capitães */
 @keyframes coin-spin {
   from {
@@ -165,6 +427,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Sem animação: o cartão do MVP/bagre aparece na hora (sem esperar o atraso da entrada). */
+  .award-reveal,
+  .award-votes-land,
+  .award-star,
+  .award-ring,
+  .award-fish,
+  .award-bubble {
+    animation-delay: 0ms !important;
+  }
+
   *,
   *::before,
   *::after {

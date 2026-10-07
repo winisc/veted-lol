@@ -6,6 +6,7 @@
 //   npm run sim:queue -- --match-seconds=60  -> duração da partida antes de os bots a encerrarem (padrão 20)
 //   npm run sim:queue -- --clean       -> apaga as contas dos bots e as partidas de teste do histórico
 //
+// Cada bot tem um elo simulado (de Ferro a Desafiante, e um sem rank), que aparece no draft sem consultar a Riot.
 // Os bots 3, 6 e 9 têm nick de 16 caracteres (inclusive um só de "W") para testar nicks longos nas telas.
 // O backend precisa estar rodando. Mantenha este script aberto: os bots saem da fila quando ele fecha (Ctrl+C).
 // No lobby, os bots votam em alguém aleatório e, se forem capitães, escolhem o lado e fazem os picks.
@@ -163,6 +164,22 @@ function onLobbyEvent(bot: Bot, lobby: LobbySnapshot | null) {
   }
 }
 
+// Elo simulado de cada bot (só o simulador usa; os jogadores de verdade vêm da Riot). A ordem mistura os elos para
+// o draft mostrar de tudo; o "none" é um bot sem rank.
+const SIM_ELOS: ({ tier: string; rank: string; leaguePoints: number } | 'none')[] = [
+  { tier: 'GOLD', rank: 'II', leaguePoints: 45 },
+  { tier: 'MASTER', rank: 'I', leaguePoints: 240 },
+  { tier: 'SILVER', rank: 'IV', leaguePoints: 12 },
+  { tier: 'EMERALD', rank: 'III', leaguePoints: 67 },
+  'none',
+  { tier: 'DIAMOND', rank: 'I', leaguePoints: 91 },
+  { tier: 'BRONZE', rank: 'II', leaguePoints: 55 },
+  { tier: 'PLATINUM', rank: 'IV', leaguePoints: 30 },
+  { tier: 'CHALLENGER', rank: 'I', leaguePoints: 980 },
+  { tier: 'IRON', rank: 'IV', leaguePoints: 8 },
+  { tier: 'GRANDMASTER', rank: 'I', leaguePoints: 520 },
+]
+
 // Alguns bots têm nick grande (16 caracteres, o máximo da Riot) para conferir como as telas lidam com nicks longos.
 // O terceiro é o pior caso: "W" é a letra mais larga.
 const LONG_NAMES = ['NomeBemGrandeBot', 'WWWWWWWWWWWWWWWW', 'MuitoMuitoGrande']
@@ -177,6 +194,8 @@ async function ensureBotUsers(): Promise<string[]> {
     const user = userRepository.findByRiotId(riot) ?? userRepository.create(riot, hash)
     // A fila exige as 3 roles no perfil: cada bot recebe roles diferentes (em rodízio).
     const order = ['top', 'jungle', 'mid', 'adc', 'support'] as const
+    const sim = SIM_ELOS[(i - 1) % SIM_ELOS.length]
+    userRepository.setSimElo(user.id, sim === 'none' ? null : { ...sim, wins: 20 + i * 7, losses: 15 + i * 5, queue: 'solo' })
     userRepository.setRoles(user.id, { main: order[i % 5], secondary: order[(i + 1) % 5], worst: order[(i + 3) % 5] })
     ids.push(`${riot.gameName}#${TAG}`)
   }

@@ -1,3 +1,4 @@
+import { eloService } from '../riot/elo.service'
 import { lobbyConfig } from './lobby.config'
 import type { Lobby, LobbySnapshot, MatchOutcome, Side } from './lobby.types'
 
@@ -84,7 +85,9 @@ export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
       isCaptain: lobby.captains.includes(p.userId),
       team: teamOf(lobby, p.userId),
       rankPosition: lobby.rankPositions.get(p.userId) ?? null,
+      rankPoints: lobby.rankPoints?.get(p.userId) ?? null,
       roles: lobby.roles.get(p.userId) ?? { main: null, secondary: null, worst: null },
+      elo: eloService.cached(p.userId) ?? null,
     })),
     myVote: lobby.votes.get(userId) ?? null,
     votedCount: lobby.votes.size,

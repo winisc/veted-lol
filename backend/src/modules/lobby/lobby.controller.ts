@@ -15,6 +15,10 @@ export const lobbyController = {
     res.json({ lobby: lobbyService.vote(req.userId!, req.body?.targetId) })
   },
 
+  react(req: AuthRequest, res: Response) {
+    res.json({ lobby: lobbyService.react(req.userId!, req.body?.reaction) })
+  },
+
   order(req: AuthRequest, res: Response) {
     res.json({ lobby: lobbyService.chooseOrder(req.userId!, req.body?.first) })
   },
