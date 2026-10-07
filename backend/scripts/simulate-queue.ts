@@ -39,7 +39,7 @@ interface LobbyPlayer {
 }
 interface LobbySnapshot {
   id: string
-  phase: 'voting' | 'captains' | 'coinflip' | 'side' | 'picking' | 'done' | 'playing' | 'result' | 'mvp' | 'bagre' | 'finished' | 'rematch'
+  phase: 'voting' | 'captains' | 'coinflip' | 'order' | 'side' | 'picking' | 'done' | 'playing' | 'result' | 'mvp' | 'bagre' | 'finished' | 'rematch'
   players: LobbyPlayer[]
   draft: { currentTurnId: number | null; pickIndex: number }
   match: { mvpCandidates: number[]; bagreCandidates: number[]; gameNumber: number; rematchVotes: number; rematchAvailable: boolean }
@@ -132,6 +132,8 @@ function onLobbyEvent(bot: Bot, lobby: LobbySnapshot | null) {
 
   if (lobby.phase === 'voting') {
     act('vote', '/lobby/vote', { targetId: random(lobby.players).id }, VOTE_DELAY_RANGE_MS)
+  } else if (lobby.phase === 'order' && myTurn) {
+    act('order', '/lobby/order', { first: random([true, false]) }, ACTION_DELAY_RANGE_MS)
   } else if (lobby.phase === 'side' && myTurn) {
     act('side', '/lobby/side', { side: random(['blue', 'red']) }, ACTION_DELAY_RANGE_MS)
   } else if (lobby.phase === 'picking' && myTurn) {

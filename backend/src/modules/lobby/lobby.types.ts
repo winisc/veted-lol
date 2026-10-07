@@ -11,6 +11,7 @@ export type LobbyPhase =
   | 'voting'
   | 'captains'
   | 'coinflip'
+  | 'order' // modo tabela: o capitão em 2º na tabela escolhe se pica primeiro ou segundo (no lugar do sorteio)
   | 'side'
   | 'picking'
   | 'done'
@@ -47,7 +48,8 @@ export interface Lobby {
   endsAt: number | null // fim da fase atual (ms desde epoch)
   durationMs: number // duração total da fase atual
   captains: number[] // userIds dos capitães, do mais votado para o menos
-  firstPickId: number | null // capitão que ganhou o sorteio
+  firstPickId: number | null // capitão que pica primeiro (ganhou o sorteio, ou escolheu pickar primeiro no modo tabela)
+  orderChooserId?: number | null // modo tabela: capitão que escolhe a ordem dos picks (o 2º colocado)
   sideChooserId: number | null // capitão que perdeu o sorteio e escolhe o lado
   sides: Partial<Record<Side, number>> // lado -> capitão
   teams: Record<Side, number[]> // userIds de cada time (capitão primeiro)
@@ -73,6 +75,7 @@ export interface Lobby {
 
 export interface DraftSnapshot {
   firstPickId: number | null
+  orderChooserId: number | null
   sideChooserId: number | null
   sides: { blue: number | null; red: number | null }
   currentTurnId: number | null // quem precisa agir agora (escolher o lado ou fazer um pick)

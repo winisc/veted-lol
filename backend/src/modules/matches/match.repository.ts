@@ -167,6 +167,23 @@ export const matchRepository = {
     return rows.map((r) => r.result as 'win' | 'loss')
   },
 
+  // Números do jogador separados por season (remakes não contam), para somar a carreira respeitando a pontuação de cada época.
+  statsBySeason(userId: number): (PlayerStats & { seasonId: number })[] {
+    return db
+      .prepare(
+        `SELECT COALESCE(m.season_id, ${LEGACY_SEASON_ID}) AS seasonId,
+                COUNT(*) AS games,
+                COALESCE(SUM(mp.result = 'win'), 0) AS wins,
+                COALESCE(SUM(mp.result = 'loss'), 0) AS losses,
+                COALESCE(SUM(mp.is_mvp), 0) AS mvps,
+                COALESCE(SUM(mp.is_bagre), 0) AS bagres
+         FROM match_players mp JOIN matches m ON m.id = mp.match_id
+         WHERE mp.user_id = ? AND mp.result != 'remake'
+         GROUP BY seasonId`,
+      )
+      .all(userId) as (PlayerStats & { seasonId: number })[]
+  },
+
   captainStats(userId: number): { games: number; wins: number } {
     return db
       .prepare(

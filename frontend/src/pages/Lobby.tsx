@@ -4,6 +4,7 @@ import LobbyAwardVote from '../components/LobbyAwardVote'
 import LobbyCaptains from '../components/LobbyCaptains'
 import LobbyCoinFlip from '../components/LobbyCoinFlip'
 import LobbyDraft from '../components/LobbyDraft'
+import LobbyOrder from '../components/LobbyOrder'
 import LobbyFinished from '../components/LobbyFinished'
 import LobbyPlaying from '../components/LobbyPlaying'
 import LobbyRematch from '../components/LobbyRematch'
@@ -21,7 +22,7 @@ import { queueModes } from '../lib/modes'
 // Etapas mostradas no topo, na ordem do lobby. Cada fase do servidor cai em uma delas.
 const stages: { label: string; phases: LobbyPhase[] }[] = [
   { label: 'Capitães', phases: ['voting', 'captains'] },
-  { label: 'Sorteio', phases: ['coinflip', 'side'] },
+  { label: 'Sorteio', phases: ['coinflip', 'order', 'side'] },
   { label: 'Draft', phases: ['picking', 'done'] },
   { label: 'Partida', phases: ['playing'] },
   { label: 'Resultado', phases: ['result', 'mvp', 'bagre'] },
@@ -67,6 +68,7 @@ export default function Lobby() {
     busy,
     error,
     vote,
+    chooseOrder,
     chooseSide,
     pick,
     voteEnd,
@@ -154,6 +156,7 @@ export default function Lobby() {
           {lobby.phase === 'voting' && <LobbyVoting lobby={lobby} skew={skew} busy={busy} onVote={vote} />}
           {lobby.phase === 'captains' && <LobbyCaptains lobby={lobby} skew={skew} />}
           {lobby.phase === 'coinflip' && <LobbyCoinFlip lobby={lobby} skew={skew} />}
+          {lobby.phase === 'order' && <LobbyOrder lobby={lobby} skew={skew} busy={busy} onChoose={chooseOrder} />}
           {lobby.phase === 'side' && <LobbySide lobby={lobby} skew={skew} busy={busy} onChoose={chooseSide} />}
           {(lobby.phase === 'picking' || lobby.phase === 'done') && (
             <LobbyDraft lobby={lobby} skew={skew} busy={busy} onPick={pick} />

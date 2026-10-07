@@ -37,7 +37,7 @@ export default function LobbyCaptains({ lobby, skew }: { lobby: LobbySnapshot; s
         {ranked
           ? `Os 2 mais bem colocados na tabela entre os 10 lideram os times.${
               drawn ? ' Quem ainda não tem posição entrou por sorteio.' : ''
-            } O sorteio decide quem escolhe primeiro.`
+            } O capitão em 2º escolhe se pica primeiro ou segundo.`
           : 'O sorteio decide quem escolhe primeiro.'}
       </SectionTitle>
 
@@ -67,7 +67,12 @@ export default function LobbyCaptains({ lobby, skew }: { lobby: LobbySnapshot; s
         })}
       </div>
 
-      <PhaseTimer endsAt={lobby.endsAt} durationMs={lobby.durationMs} skew={skew} label="Sorteio em instantes" />
+      <PhaseTimer
+        endsAt={lobby.endsAt}
+        durationMs={lobby.durationMs}
+        skew={skew}
+        label={ranked ? 'Escolha de ordem em instantes' : 'Sorteio em instantes'}
+      />
 
       <div>
         <h3 className="mb-2 font-display text-base text-gold-50">

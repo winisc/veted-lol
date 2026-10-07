@@ -8,6 +8,7 @@ export const phaseLabel: Record<LobbyPhase, string> = {
   voting: 'Votação de capitães',
   captains: 'Capitães definidos',
   coinflip: 'Sorteio',
+  order: 'Escolha de ordem',
   side: 'Escolha de lado',
   picking: 'Draft',
   done: 'Times formados',

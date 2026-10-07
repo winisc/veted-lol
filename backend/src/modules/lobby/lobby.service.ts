@@ -77,6 +77,8 @@ function timeoutAction(lobby: Lobby): (() => void) | null {
       return () => startCoinflip(lobby)
     case 'coinflip':
       return () => startSide(lobby)
+    case 'order':
+      return () => applyOrder(lobby, randomItem([true, false]))
     case 'side':
       return () => applySide(lobby, randomItem<Side>(['blue', 'red']))
     case 'picking':
@@ -137,6 +139,21 @@ function startCoinflip(lobby: Lobby) {
   lobby.firstPickId = winner
   lobby.sideChooserId = lobby.captains.find((id) => id !== winner) ?? null
   setPhase(lobby, 'coinflip', lobbyConfig.coinflipMs, () => startSide(lobby))
+}
+
+// Modo tabela: em vez do sorteio, o capitão em 2º na tabela escolhe se pica primeiro ou segundo.
+// Quem pica por último escolhe o lado (a mesma regra de quando era sorteio: quem não pica primeiro escolhe o lado).
+function startOrder(lobby: Lobby) {
+  lobby.orderChooserId = lobby.captains[1] ?? lobby.captains[0]
+  setPhase(lobby, 'order', lobbyConfig.orderMs, () => applyOrder(lobby, randomItem([true, false])))
+}
+
+function applyOrder(lobby: Lobby, pickFirst: boolean) {
+  const chooserId = lobby.orderChooserId!
+  const otherId = lobby.captains.find((id) => id !== chooserId)!
+  lobby.firstPickId = pickFirst ? chooserId : otherId
+  lobby.sideChooserId = pickFirst ? otherId : chooserId
+  startSide(lobby)
 }
 
 function startSide(lobby: Lobby) {
@@ -407,7 +424,7 @@ export const lobbyService = {
     if (mode === 'ranked') {
       // Sem votação: capitães pela tabela e já mostra o resultado antes do sorteio.
       lobby.captains = pickCaptainsByRanking(lobby)
-      setPhase(lobby, 'captains', lobbyConfig.revealMs, () => startCoinflip(lobby))
+      setPhase(lobby, 'captains', lobbyConfig.revealMs, () => startOrder(lobby))
     } else {
       setPhase(lobby, 'voting', lobbyConfig.voteMs, () => finishVoting(lobby))
     }
@@ -435,7 +452,18 @@ export const lobbyService = {
     return snapshotFor(lobby, userId)
   },
 
-  // O capitão que perdeu o sorteio escolhe o lado.
+  // Modo tabela: o capitão em 2º na tabela escolhe se pica primeiro (`first: true`) ou segundo.
+  chooseOrder(userId: number, first: unknown): LobbySnapshot {
+    const lobby = requireLobby(userId)
+    if (lobby.phase !== 'order') throw new AppError('Não é o momento de escolher a ordem dos picks.', 409)
+    if (userId !== lobby.orderChooserId) throw new AppError('Só o capitão em 2º na tabela escolhe a ordem.', 403)
+    if (typeof first !== 'boolean') throw new AppError('Escolha pickar primeiro ou segundo.', 400)
+
+    applyOrder(lobby, first)
+    return snapshotFor(lobby, userId)
+  },
+
+  // O capitão que não pica primeiro escolhe o lado.
   chooseSide(userId: number, side: unknown): LobbySnapshot {
     const lobby = requireLobby(userId)
     if (lobby.phase !== 'side') throw new AppError('Não é o momento de escolher o lado.', 409)

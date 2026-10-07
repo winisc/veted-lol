@@ -20,13 +20,13 @@ export interface RankingEntry {
 }
 
 // Ordem: mais pontos, depois melhor win rate, mais vitórias, mais MVPs, menos bagres e, por fim, nome.
-export function buildRanking(rows: RankingRow[]): RankingEntry[] {
+export function buildRanking(rows: RankingRow[], seasonId: number): RankingEntry[] {
   return rows
     .map((row) => ({
       userId: row.userId,
       riotId: formatRiotId(row.gameName, row.tagLine),
       iconId: resolveIconId(row.userId, row.profileIconId),
-      points: computePoints(row),
+      points: computePoints(row, seasonId),
       games: row.games,
       wins: row.wins,
       losses: row.losses,

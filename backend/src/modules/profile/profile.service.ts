@@ -3,7 +3,7 @@ import { isRole, type PlayerRoles, type Role } from '../../shared/types/roles'
 import { formatRiotId } from '../../shared/utils/riotId'
 import { matchRepository } from '../matches/match.repository'
 import type { Rival } from '../matches/match.types'
-import { computePoints, matchPoints, scoring, winRate } from '../matches/match.scoring'
+import { computePoints, matchPoints, scoringFor, winRate } from '../matches/match.scoring'
 import { getRanking } from '../ranking/ranking.service'
 import { LEGACY_SEASON_ID } from '../seasons/season.constants'
 import { seasonRepository } from '../seasons/season.repository'
@@ -99,7 +99,7 @@ export const profileService = {
         roles: user.roles,
       },
       stats: {
-        points: computePoints(stats),
+        points: computePoints(stats, season.id),
         games: stats.games,
         wins: stats.wins,
         losses: stats.losses,
@@ -123,9 +123,9 @@ export const profileService = {
       },
       history: matchRepository.historyForUser(userId, HISTORY_LIMIT).map((match) => ({
         ...match,
-        points: matchPoints(match.result, match.isMvp, match.isBagre),
+        points: matchPoints(match.result, match.isMvp, match.isBagre, match.seasonId),
       })),
-      scoring,
+      scoring: scoringFor(season.id),
     }
   },
 

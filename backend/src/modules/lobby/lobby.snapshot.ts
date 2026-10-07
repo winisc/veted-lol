@@ -91,9 +91,11 @@ export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
     captains: lobby.captains,
     draft: {
       firstPickId: lobby.firstPickId,
+      orderChooserId: lobby.orderChooserId ?? null,
       sideChooserId: lobby.sideChooserId,
       sides: { blue: lobby.sides.blue ?? null, red: lobby.sides.red ?? null },
-      currentTurnId: lobby.phase === 'side' ? lobby.sideChooserId : currentPickerId(lobby),
+      currentTurnId:
+        lobby.phase === 'side' ? lobby.sideChooserId : lobby.phase === 'order' ? (lobby.orderChooserId ?? null) : currentPickerId(lobby),
       turnPicksLeft: turnPicksLeft(lobby),
       pickIndex: lobby.pickIndex,
       totalPicks: lobby.pickOrder.length,

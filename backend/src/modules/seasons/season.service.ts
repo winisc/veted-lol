@@ -14,7 +14,7 @@ const CHECK_EVERY_MS = 60_000
 
 // Congela a tabela de uma season: guarda a posição final de cada jogador e a marca como encerrada.
 function closeSeason(season: Season) {
-  seasonRepository.saveStandings(season.id, buildRanking(matchRepository.rankingRows(season.id)))
+  seasonRepository.saveStandings(season.id, buildRanking(matchRepository.rankingRows(season.id), season.id))
   seasonRepository.close(season.id)
 }
 

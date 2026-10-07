@@ -33,14 +33,14 @@ export default function ProfileSeasons({ seasons }: { seasons: SeasonResult[] })
           <li
             key={s.id}
             title={`Season ${s.id}${s.current ? ' (em andamento)' : ''} · ${period} · ${detail}`}
-            className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
+            className={`flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs leading-none ${
               s.current ? 'border-hex-300/40 bg-hex-300/10' : 'border-rim bg-abyss/70'
             }`}
           >
             <span className="font-semibold text-gold-50">Season {s.id}</span>
             {s.position !== null && zone ? (
               <>
-                <span className={`font-cond text-sm font-bold tabular-nums ${zone.text}`}>#{s.position}</span>
+                <span className={`font-cond text-sm font-bold leading-none tabular-nums ${zone.text}`}>#{s.position}</span>
                 <span className="text-ash">{s.points} pts</span>
               </>
             ) : (

@@ -34,7 +34,10 @@ export default function LobbySide({ lobby, skew, busy, onChoose }: Props) {
   return (
     <div className="space-y-5">
       <SectionTitle title="Escolha de lado">
-        {short(first)} venceu o sorteio e escolhe primeiro. {isChooser ? 'Você' : short(chooser)} escolhe o lado.
+        {lobby.mode === 'ranked'
+          ? `${short(first)} vai pickar primeiro. `
+          : `${short(first)} venceu o sorteio e escolhe primeiro. `}
+        {isChooser ? 'Você' : short(chooser)} escolhe o lado.
       </SectionTitle>
 
       <PhaseTimer endsAt={lobby.endsAt} durationMs={lobby.durationMs} skew={skew} label="Sem escolha, o lado é sorteado" />

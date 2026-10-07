@@ -9,6 +9,7 @@ export type LobbyPhase =
   | 'voting'
   | 'captains'
   | 'coinflip'
+  | 'order' // modo tabela: o capitão em 2º na tabela escolhe se pica primeiro ou segundo
   | 'side'
   | 'picking'
   | 'done'
@@ -40,6 +41,7 @@ export interface Pick {
 
 export interface DraftSnapshot {
   firstPickId: number | null
+  orderChooserId?: number | null
   sideChooserId: number | null
   sides: { blue: number | null; red: number | null }
   currentTurnId: number | null
@@ -137,6 +139,7 @@ export function useLobby() {
   }, [])
 
   const vote = useCallback((targetId: number) => act('/lobby/vote', { targetId }), [act])
+  const chooseOrder = useCallback((first: boolean) => act('/lobby/order', { first }), [act])
   const chooseSide = useCallback((side: Side) => act('/lobby/side', { side }), [act])
   const pick = useCallback((playerId: number) => act('/lobby/pick', { playerId }), [act])
   const voteEnd = useCallback((value: boolean) => act('/lobby/end', { vote: value }), [act])
@@ -166,6 +169,7 @@ export function useLobby() {
     busy,
     error,
     vote,
+    chooseOrder,
     chooseSide,
     pick,
     voteEnd,

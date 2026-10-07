@@ -53,6 +53,8 @@ export const adminService = {
   users() {
     return userRepository.listAll().map((user) => {
       const stats = matchRepository.statsForUser(user.id)
+      // Carreira inteira: cada season entra com a pontuação da sua época.
+      const careerPoints = matchRepository.statsBySeason(user.id).reduce((sum, s) => sum + computePoints(s, s.seasonId), 0)
       return {
         id: user.id,
         riotId: formatRiotId(user.gameName, user.tagLine),
@@ -67,7 +69,7 @@ export const adminService = {
         mvps: stats.mvps,
         bagres: stats.bagres,
         winRate: winRate(stats.wins, stats.losses),
-        points: computePoints(stats),
+        points: careerPoints,
       }
     })
   },

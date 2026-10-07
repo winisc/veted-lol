@@ -6,6 +6,7 @@ export const lobbyConfig = {
   revealMs: seconds('LOBBY_REVEAL_SECONDS', 6), // tela com o resultado dos capitães
   coinflipMs: seconds('LOBBY_COINFLIP_SECONDS', 5),
   sideMs: seconds('LOBBY_SIDE_SECONDS', 20),
+  orderMs: seconds('LOBBY_ORDER_SECONDS', 20), // modo tabela: o 2º colocado escolhe pickar primeiro ou segundo
   pickMs: seconds('LOBBY_PICK_SECONDS', 30), // tempo para cada pick
   doneMs: seconds('LOBBY_DONE_SECONDS', 5), // tela do draft finalizado, antes da partida começar
   mvpMs: seconds('LOBBY_MVP_SECONDS', 60), // votação de MVP
