@@ -296,7 +296,7 @@ export default function Ranking() {
                 }`}
               >
                 {seasonLabel(s)}
-                {s.current && <span className="ml-1.5 text-xs font-normal text-hex-300">atual</span>}
+                {s.current && <span className="ml-1.5 text-xs font-normal text-hex-300">Atual</span>}
               </button>
             );
           })}
