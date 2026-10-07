@@ -5,7 +5,7 @@ import Panel from './ui/Panel'
 export interface SeasonResult {
   id: number
   current: boolean
-  legacy: boolean // season 0: a tabela antiga, de antes das seasons
+  legacy: boolean // a tabela antiga, de antes das seasons semanais
   startsAt: string
   endsAt: string
   position: number | null // null: não jogou nessa season
@@ -15,7 +15,7 @@ export interface SeasonResult {
   rankedPlayers: number
 }
 
-const seasonName = (s: SeasonResult) => (s.legacy ? 'Tabela antiga' : `Season ${s.id}`)
+const seasonName = (s: SeasonResult) => `Season ${s.id}`
 
 // Posição do jogador em cada season: a atual (em andamento) e as encerradas, com a classificação final guardada.
 export default function ProfileSeasons({ seasons }: { seasons: SeasonResult[] }) {

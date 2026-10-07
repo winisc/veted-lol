@@ -1,6 +1,7 @@
 import db from '../../database/db'
 import { resolveIconId } from '../../shared/utils/icons'
 import { formatRiotId } from '../../shared/utils/riotId'
+import { LEGACY_SEASON_ID } from '../seasons/season.constants'
 import type { AdminMatch, AdminMatchPlayerRow, MatchDetail, MatchVote, PlayerResult, Rival, HistoryRow, MatchOutcome, NewMatch, PlayerStats, RankingRow } from './match.types'
 
 const insertMatch = db.prepare(
@@ -59,7 +60,7 @@ export const matchRepository = {
            COALESCE(SUM(mp.is_mvp), 0) AS mvps,
            COALESCE(SUM(mp.is_bagre), 0) AS bagres
          FROM match_players mp JOIN matches m ON m.id = mp.match_id
-         WHERE mp.user_id = ? AND mp.result != 'remake' AND (? IS NULL OR COALESCE(m.season_id, 0) = ?)`,
+         WHERE mp.user_id = ? AND mp.result != 'remake' AND (? IS NULL OR COALESCE(m.season_id, ${LEGACY_SEASON_ID}) = ?)`,
       )
       .get(userId, seasonId ?? null, seasonId ?? null) as PlayerStats
     return row
@@ -79,7 +80,7 @@ export const matchRepository = {
          FROM match_players mp
          JOIN matches m ON m.id = mp.match_id
          JOIN users u ON u.id = mp.user_id
-         WHERE mp.result != 'remake' AND (? IS NULL OR COALESCE(m.season_id, 0) = ?)
+         WHERE mp.result != 'remake' AND (? IS NULL OR COALESCE(m.season_id, ${LEGACY_SEASON_ID}) = ?)
          GROUP BY u.id`,
       )
       .all(seasonId ?? null, seasonId ?? null) as RankingRow[]
@@ -93,7 +94,7 @@ export const matchRepository = {
         `SELECT
            m.id AS matchId, m.ended_at AS endedAt, m.duration_seconds AS durationSeconds,
            mp.side AS side, mp.result AS result, mp.is_captain AS isCaptain, mp.is_mvp AS isMvp,
-           mp.is_bagre AS isBagre, COALESCE(m.season_id, 0) AS seasonId
+           mp.is_bagre AS isBagre, COALESCE(m.season_id, ${LEGACY_SEASON_ID}) AS seasonId
          FROM match_players mp
          JOIN matches m ON m.id = mp.match_id
          WHERE mp.user_id = ?

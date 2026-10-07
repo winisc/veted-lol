@@ -1,6 +1,7 @@
 import { AppError } from '../../shared/errors/AppError'
 import { matchRepository } from '../matches/match.repository'
 import { scoring } from '../matches/match.scoring'
+import { LEGACY_SEASON_ID } from '../seasons/season.constants'
 import { seasonRepository, type Season } from '../seasons/season.repository'
 import { seasonService } from '../seasons/season.service'
 import { buildRanking, type RankingEntry } from './ranking.builder'
@@ -19,7 +20,7 @@ const seasonInfo = (season: Season, currentId: number) => ({
   startsAt: season.startsAt,
   endsAt: season.endsAt,
   current: season.id === currentId,
-  legacy: season.id === 0, // a tabela antiga, de antes das seasons
+  legacy: season.id === LEGACY_SEASON_ID, // a tabela antiga, de antes das seasons
 })
 
 export const rankingService = {

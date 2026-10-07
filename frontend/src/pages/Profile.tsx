@@ -161,6 +161,8 @@ export default function Profile() {
         </div>
       </section>
 
+      {seasons && seasons.length > 0 && <ProfileSeasons seasons={seasons} />}
+
       <Panel
         title={season ? `Estatísticas · Season ${season.id}` : 'Estatísticas'}
         action={season && <SeasonCountdown key={season.endsAt} endsAt={season.endsAt} now={season.now} />}
@@ -186,7 +188,6 @@ export default function Profile() {
           evolution={pointsEvolution(season ? history.filter((m) => m.seasonId === season.id) : history, stats.points)}
         />
       )}
-      {seasons && seasons.length > 0 && <ProfileSeasons seasons={seasons} />}
 
       <Panel title={viewingOther ? 'Partidas recentes' : 'Histórico de partidas'} bodyClassName="p-3">
         {history.length === 0 ? (

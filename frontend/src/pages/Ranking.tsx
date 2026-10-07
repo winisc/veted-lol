@@ -45,7 +45,7 @@ interface RankingResponse {
   now?: number;
 }
 
-const seasonLabel = (s: SeasonInfo) => (s.legacy ? "Tabela antiga" : `Season ${s.id}`);
+const seasonLabel = (s: SeasonInfo) => `Season ${s.id}`;
 
 const COLUMNS = 9;
 

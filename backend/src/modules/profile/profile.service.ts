@@ -5,6 +5,7 @@ import { matchRepository } from '../matches/match.repository'
 import type { Rival } from '../matches/match.types'
 import { computePoints, matchPoints, scoring, winRate } from '../matches/match.scoring'
 import { getRanking } from '../ranking/ranking.service'
+import { LEGACY_SEASON_ID } from '../seasons/season.constants'
 import { seasonRepository } from '../seasons/season.repository'
 import { seasonService } from '../seasons/season.service'
 import { userRepository } from '../users/user.repository'
@@ -77,7 +78,7 @@ export const profileService = {
       return {
         id: s.id,
         current: s.id === season.id,
-        legacy: s.id === 0,
+        legacy: s.id === LEGACY_SEASON_ID,
         startsAt: s.startsAt,
         endsAt: s.endsAt,
         position: row?.position ?? null, // null: não jogou nessa season
