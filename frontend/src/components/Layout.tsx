@@ -46,6 +46,19 @@ function QueueStatus({ compact }: { compact?: boolean }) {
     )
   }
 
+  if (snapshot?.status === 'standby' && snapshot.standby) {
+    return (
+      <Link
+        to="/"
+        className={`flex items-center gap-2 rounded-md border border-rim bg-panel text-gold-50 ${compact ? 'px-2.5 py-1 text-xs' : 'px-3 py-2.5 text-sm'}`}
+      >
+        <span className="h-2 w-2 rounded-full bg-ash" />
+        <span className="font-semibold">Na espera{snapshot.mode && ` · ${queueModes[snapshot.mode].short}`}</span>
+        <span className="ml-auto font-cond text-base font-bold tabular-nums">{snapshot.standby.position}º</span>
+      </Link>
+    )
+  }
+
   if (snapshot?.status === 'ready_check') {
     return (
       <span

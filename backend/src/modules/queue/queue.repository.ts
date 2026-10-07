@@ -4,6 +4,8 @@ import type { QueuePlayer, ReadyCheck } from './queue.types'
 // Estado em memória: as filas são temporárias e somem se o servidor reiniciar.
 // Uma fila por modo; a Map mantém a ordem de inserção, então cada fila é FIFO.
 const waiting: Record<QueueMode, Map<number, QueuePlayer>> = { vote: new Map(), ranked: new Map() }
+// Lista de espera de cada modo: fora da fila de verdade, em ordem de chegada.
+const standby: Record<QueueMode, Map<number, QueuePlayer>> = { vote: new Map(), ranked: new Map() }
 const readyChecks = new Map<string, ReadyCheck>()
 const readyCheckByUser = new Map<number, string>()
 
@@ -12,13 +14,15 @@ export const queueRepository = {
   dump() {
     return {
       waiting: { vote: [...waiting.vote.values()], ranked: [...waiting.ranked.values()] },
+      standby: { vote: [...standby.vote.values()], ranked: [...standby.ranked.values()] },
       readyChecks: [...readyChecks.values()],
     }
   },
 
   // Recoloca o estado guardado (ao iniciar o servidor).
-  restore(saved: { waiting: Record<QueueMode, QueuePlayer[]>; readyChecks: ReadyCheck[] }) {
+  restore(saved: { waiting: Record<QueueMode, QueuePlayer[]>; standby?: Record<QueueMode, QueuePlayer[]>; readyChecks: ReadyCheck[] }) {
     for (const mode of QUEUE_MODES) waiting[mode] = new Map((saved.waiting[mode] ?? []).map((p) => [p.userId, p] as const))
+    for (const mode of QUEUE_MODES) standby[mode] = new Map((saved.standby?.[mode] ?? []).map((p) => [p.userId, p] as const))
     for (const check of saved.readyChecks) {
       readyChecks.set(check.id, check)
       for (const player of check.players) readyCheckByUser.set(player.userId, check.id)
@@ -58,6 +62,30 @@ export const queueRepository = {
 
   sizes(): Record<QueueMode, number> {
     return { vote: waiting.vote.size, ranked: waiting.ranked.size }
+  },
+
+  // ---- lista de espera ----
+
+  // Em qual lista de espera o jogador está (null se em nenhuma).
+  standbyModeOf(userId: number): QueueMode | null {
+    return QUEUE_MODES.find((mode) => standby[mode].has(userId)) ?? null
+  },
+
+  addStandby(mode: QueueMode, player: QueuePlayer) {
+    standby[mode].set(player.userId, player)
+  },
+
+  // Tira de qualquer lista de espera. Devolve se estava em alguma.
+  removeStandby(userId: number) {
+    return QUEUE_MODES.some((mode) => standby[mode].delete(userId))
+  },
+
+  listStandby(mode: QueueMode): QueuePlayer[] {
+    return [...standby[mode].values()]
+  },
+
+  standbySizes(): Record<QueueMode, number> {
+    return { vote: standby.vote.size, ranked: standby.ranked.size }
   },
 
   // ---- confirmações de partida ----

@@ -7,6 +7,14 @@ export const queueController = {
     res.json(queueService.join(req.userId!, req.body?.mode ?? 'vote'))
   },
 
+  joinStandby(req: AuthRequest, res: Response) {
+    res.json(queueService.joinStandby(req.userId!, req.body?.mode))
+  },
+
+  promote(req: AuthRequest, res: Response) {
+    res.json(queueService.promoteFromStandby(req.userId!))
+  },
+
   leave(req: AuthRequest, res: Response) {
     res.json(queueService.leave(req.userId!))
   },

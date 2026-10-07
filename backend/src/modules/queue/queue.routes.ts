@@ -9,6 +9,8 @@ queueRoutes.use(requireAuth)
 queueRoutes.get('/events', queueController.events)
 queueRoutes.post('/join', queueController.join)
 queueRoutes.post('/leave', queueController.leave)
+queueRoutes.post('/standby', queueController.joinStandby)
+queueRoutes.post('/standby/promote', queueController.promote)
 queueRoutes.post('/accept', queueController.accept)
 queueRoutes.post('/decline', queueController.decline)
 

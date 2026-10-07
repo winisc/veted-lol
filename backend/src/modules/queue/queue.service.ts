@@ -16,6 +16,8 @@ import type { DropReason, QueueSnapshot, ReadyCheck } from './queue.types'
 const REQUIRED = Number(process.env.QUEUE_SIZE) || 10
 // Prazo para aceitar a partida quando a fila fecha.
 const READY_CHECK_MS = (Number(process.env.READY_CHECK_SECONDS) || 15) * 1000
+// Tamanho máximo da lista de espera de cada modo.
+const STANDBY_MAX = Number(process.env.QUEUE_STANDBY_SIZE) || 5
 // Tempo para o jogador reconectar (ex.: F5) antes de ser removido da fila.
 const DISCONNECT_GRACE_MS = 15_000
 
@@ -48,14 +50,31 @@ function armDisconnectTimer(userId: number) {
     userId,
     setTimeout(() => {
       disconnectTimers.delete(userId)
-      if (!queueEvents.hasConnection(userId) && queueRepository.remove(userId)) broadcast()
+      if (!queueEvents.hasConnection(userId) && (queueRepository.remove(userId) || queueRepository.removeStandby(userId))) {
+        broadcast()
+      }
     }, DISCONNECT_GRACE_MS),
   )
 }
 
 function snapshot(userId: number, notice?: string, dropped?: QueueSnapshot['dropped']): QueueSnapshot {
   const sizes = queueRepository.sizes()
-  const base = { mode: null, size: 0, sizes, required: REQUIRED, readyCheck: null, notice, dropped }
+  const base = {
+    mode: null,
+    size: 0,
+    sizes,
+    required: REQUIRED,
+    readyCheck: null,
+    notice,
+    dropped,
+    standbySizes: queueRepository.standbySizes(),
+    standbyMax: STANDBY_MAX,
+    standby: null,
+  }
+  const queuePlayers = (mode: QueueMode) =>
+    queueRepository
+      .list(mode)
+      .map((p) => ({ userId: p.userId, riotId: p.riotId, iconId: p.iconId, isYou: p.userId === userId }))
 
   if (lobbyRepository.findByUser(userId)) return { ...base, status: 'matched', players: [] }
 
@@ -73,6 +92,26 @@ function snapshot(userId: number, notice?: string, dropped?: QueueSnapshot['drop
         accepted: check.accepted.size,
         total: check.players.length,
         iAccepted: check.accepted.has(userId),
+      },
+    }
+  }
+
+  // Na lista de espera: vê a fila do modo, mas não faz parte dela.
+  const standbyMode = queueRepository.standbyModeOf(userId)
+  if (standbyMode) {
+    const list = queueRepository.listStandby(standbyMode)
+    const position = list.findIndex((p) => p.userId === userId) + 1
+    return {
+      ...base,
+      status: 'standby',
+      mode: standbyMode,
+      size: sizes[standbyMode],
+      players: queuePlayers(standbyMode),
+      standby: {
+        position,
+        size: list.length,
+        canJoin: position === 1,
+        players: list.map((p) => ({ userId: p.userId, riotId: p.riotId, iconId: p.iconId, isYou: p.userId === userId })),
       },
     }
   }
@@ -182,7 +221,7 @@ export const queueService = {
       armReadyCheckTimer(check, remaining)
     }
     // Quem estava esperando precisa reconectar; quem não voltar sai da fila pelo tempo de tolerância de sempre.
-    const waiting = QUEUE_MODES.flatMap((mode) => queueRepository.list(mode))
+    const waiting = QUEUE_MODES.flatMap((mode) => [...queueRepository.list(mode), ...queueRepository.listStandby(mode)])
     for (const player of waiting) armDisconnectTimer(player.userId)
 
     return waiting.length + saved.readyChecks.reduce((sum, check) => sum + check.players.length, 0)
@@ -194,6 +233,10 @@ export const queueService = {
     if (lobbyRepository.findByUser(userId)) throw new AppError('Você já está em um lobby.', 409)
     if (queueRepository.findReadyCheck(userId)) {
       throw new AppError('Você está numa confirmação de partida. Aceite ou recuse antes de trocar de fila.', 409)
+    }
+    // Quem está na espera só entra na fila pelo botão da espera (e só o primeiro).
+    if (queueRepository.standbyModeOf(userId)) {
+      throw new AppError('Você está na lista de espera. Quando for o primeiro, use "Entrar na fila" da espera.', 409)
     }
 
     const current = queueRepository.modeOf(userId)
@@ -222,8 +265,50 @@ export const queueService = {
       failReadyCheck(check, [userId], undefined, 'declined')
       return snapshot(userId)
     }
-    if (queueRepository.remove(userId)) broadcast()
+    // Sai da fila e também da lista de espera (o mesmo botão "Sair" serve para os dois).
+    const left = queueRepository.remove(userId)
+    const leftStandby = queueRepository.removeStandby(userId)
+    if (left || leftStandby) broadcast()
     return snapshot(userId)
+  },
+
+  // Entra na lista de espera de um modo: fica fora da fila, vendo a fila atual, na ordem de chegada.
+  joinStandby(userId: number, mode: unknown): QueueSnapshot {
+    if (!isQueueMode(mode)) throw new AppError('Modo de fila inválido.', 400)
+    if (lobbyRepository.findByUser(userId)) throw new AppError('Você já está em um lobby.', 409)
+    if (queueRepository.findReadyCheck(userId)) throw new AppError('Você está numa confirmação de partida.', 409)
+    if (queueRepository.isWaiting(userId)) throw new AppError('Você já está na fila. Saia dela antes de ir para a espera.', 409)
+
+    const current = queueRepository.standbyModeOf(userId)
+    if (current === mode) return snapshot(userId) // já está nessa espera
+
+    const user = userRepository.findById(userId)
+    if (!user) throw new AppError('Usuário não encontrado.', 401)
+    // Mesma exigência da fila: as 3 roles salvas no perfil.
+    const { main, secondary, worst } = user.roles
+    if (!main || !secondary || !worst) {
+      throw new AppError('Defina suas roles no perfil antes de entrar na fila.', 409, 'ROLES_REQUIRED')
+    }
+    if (queueRepository.listStandby(mode).length >= STANDBY_MAX) {
+      throw new AppError(`A lista de espera deste modo está cheia (${STANDBY_MAX}/${STANDBY_MAX}).`, 409)
+    }
+
+    if (current) queueRepository.removeStandby(userId) // troca de espera: vai para o fim da outra
+    queueRepository.addStandby(mode, { userId, riotId: formatRiotId(user.gameName, user.tagLine), iconId: user.iconId })
+    broadcast()
+    return snapshot(userId)
+  },
+
+  // O primeiro da espera entra na fila de verdade (a qualquer momento). Quem vem depois passa a ser o primeiro.
+  promoteFromStandby(userId: number): QueueSnapshot {
+    const mode = queueRepository.standbyModeOf(userId)
+    if (!mode) throw new AppError('Você não está na lista de espera.', 409)
+    if (queueRepository.listStandby(mode)[0]?.userId !== userId) {
+      throw new AppError('Só o primeiro da espera pode entrar na fila.', 409)
+    }
+
+    queueRepository.removeStandby(userId)
+    return queueService.join(userId, mode)
   },
 
   accept(userId: number): QueueSnapshot {
@@ -257,7 +342,10 @@ export const queueService = {
       endsAt: c.endsAt,
       players: c.players.map((p) => ({ id: p.userId, riotId: p.riotId, iconId: p.iconId, accepted: c.accepted.has(p.userId) })),
     }))
-    return { required: REQUIRED, waiting, readyChecks: checks }
+    const standbyList = QUEUE_MODES.flatMap((mode) =>
+      queueRepository.listStandby(mode).map((p) => ({ id: p.userId, riotId: p.riotId, iconId: p.iconId, mode })),
+    )
+    return { required: REQUIRED, waiting, standby: standbyList, readyChecks: checks }
   },
 
   // Tira um jogador da fila (ou da confirmação de partida, o que devolve os outros para a fila).
@@ -267,15 +355,23 @@ export const queueService = {
       failReadyCheck(check, [userId], 'Um admin tirou você da fila.', 'removed')
       return
     }
-    if (!queueRepository.remove(userId)) throw new AppError('Esse jogador não está na fila.', 404)
+    if (!queueRepository.remove(userId) && !queueRepository.removeStandby(userId)) {
+      throw new AppError('Esse jogador não está na fila.', 404)
+    }
     queueEvents.send(userId, snapshot(userId, 'Um admin tirou você da fila.'))
     broadcast()
   },
 
   // Esvazia a fila de espera (confirmações em andamento continuam).
   adminClear() {
-    const removed = QUEUE_MODES.flatMap((mode) => queueRepository.list(mode).map((p) => p.userId))
-    for (const userId of removed) queueRepository.remove(userId)
+    const removed = QUEUE_MODES.flatMap((mode) => [
+      ...queueRepository.list(mode).map((p) => p.userId),
+      ...queueRepository.listStandby(mode).map((p) => p.userId),
+    ])
+    for (const userId of removed) {
+      queueRepository.remove(userId)
+      queueRepository.removeStandby(userId)
+    }
     for (const userId of removed) queueEvents.send(userId, snapshot(userId, 'Um admin esvaziou a fila.'))
     broadcast()
     return removed.length
@@ -293,7 +389,8 @@ export const queueService = {
 
     req.on('close', () => {
       queueEvents.remove(userId, res)
-      if (queueEvents.hasConnection(userId) || !queueRepository.isWaiting(userId)) return
+      if (queueEvents.hasConnection(userId)) return
+      if (!queueRepository.isWaiting(userId) && !queueRepository.standbyModeOf(userId)) return
 
       // Fechou a aba: remove da fila depois de um tempo, para não sobrar jogador fantasma.
       // (Na confirmação de partida não precisa: quem não aceitar a tempo já sai.)

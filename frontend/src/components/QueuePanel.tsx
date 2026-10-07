@@ -122,8 +122,39 @@ function QueuedView({ snapshot, busy, onLeave, onSwitch }: QueuedViewProps) {
   )
 }
 
+// Botão pequeno "Entrar na espera": vai para a lista de espera do modo (até `max` pessoas), fora da fila.
+function StandbyJoin({ waiting, max, busy, onClick }: { waiting: number; max: number; busy: boolean; onClick: () => void }) {
+  const full = waiting >= max
+  return (
+    <div className="-mt-1 flex items-center justify-between gap-2 border-t border-rim pt-2.5 text-xs text-ash">
+      <span>
+        Lista de espera <span className="font-cond text-sm font-semibold tabular-nums text-gold-50">{waiting}/{max}</span>
+      </span>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={busy || full}
+        title="Fica de reserva: vê a fila e, quando for o primeiro da espera, pode entrar nela"
+        className="rounded-md border border-rim bg-panel px-2.5 py-1 font-semibold text-gold-50 transition-colors hover:border-ash-dim disabled:opacity-50"
+      >
+        {full ? 'Espera cheia' : 'Entrar na espera'}
+      </button>
+    </div>
+  )
+}
+
 // Fora da fila: um cartão por modo, cada um com a sua fila.
-function ModePicker({ snapshot, busy, onJoin }: { snapshot: QueueSnapshot; busy: boolean; onJoin: (mode: QueueMode) => void }) {
+function ModePicker({
+  snapshot,
+  busy,
+  onJoin,
+  onStandby,
+}: {
+  snapshot: QueueSnapshot
+  busy: boolean
+  onJoin: (mode: QueueMode) => void
+  onStandby: (mode: QueueMode) => void
+}) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {queueModeOrder.map((mode) => {
@@ -147,6 +178,14 @@ function ModePicker({ snapshot, busy, onJoin }: { snapshot: QueueSnapshot; busy:
                 Entrar na fila
               </HexButton>
             </div>
+            {snapshot.standbyMax !== undefined && (
+              <StandbyJoin
+                waiting={snapshot.standbySizes?.[mode] ?? 0}
+                max={snapshot.standbyMax}
+                busy={busy}
+                onClick={() => onStandby(mode)}
+              />
+            )}
           </div>
         )
       })}
@@ -154,14 +193,81 @@ function ModePicker({ snapshot, busy, onJoin }: { snapshot: QueueSnapshot; busy:
   )
 }
 
+// Na lista de espera: o jogador não está na fila, só vê a fila do modo e a ordem da espera. O primeiro pode entrar.
+function StandbyView({ snapshot, busy, onJoin, onLeave }: { snapshot: QueueSnapshot; busy: boolean; onJoin: () => void; onLeave: () => void }) {
+  const mode = snapshot.mode ?? 'vote'
+  const standby = snapshot.standby
+  if (!standby) return null
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="flex items-center gap-2 font-display text-2xl text-gold-50">
+            Na lista de espera
+            <span className="rounded bg-gold-200/15 px-2 py-0.5 font-sans text-xs font-semibold text-gold-200">{queueModes[mode].name}</span>
+          </p>
+          <p className="mt-1 text-sm text-ash">
+            {standby.canJoin
+              ? 'Você é o primeiro da espera: entre na fila quando quiser.'
+              : `Você é o ${standby.position}º da espera. Quando chegar a sua vez, o botão de entrar na fila é liberado.`}
+          </p>
+        </div>
+        <p className="text-right">
+          <span className="block font-cond text-4xl font-bold leading-none tabular-nums text-gold-50">
+            {snapshot.size}
+            <span className="text-xl text-ash">/{snapshot.required}</span>
+          </span>
+          <span className="text-xs text-ash">na fila agora</span>
+        </p>
+      </div>
+
+      <QueueSlots snapshot={snapshot} />
+
+      {/* A ordem da espera */}
+      <div>
+        <p className="mb-1.5 text-xs font-semibold text-ash">
+          Lista de espera ({standby.size}/{snapshot.standbyMax})
+        </p>
+        <ol className="flex flex-wrap gap-1.5">
+          {standby.players.map((p, i) => (
+            <li
+              key={p.userId}
+              className={`flex items-center gap-1.5 rounded-md border py-1 pl-1.5 pr-2.5 text-sm ${
+                p.isYou ? 'border-gold-200/40 bg-gold-200/10' : 'border-rim bg-panel'
+              }`}
+            >
+              <span className="font-cond text-sm font-bold tabular-nums text-ash">{i + 1}º</span>
+              <SummonerIcon iconId={p.iconId} size="xs" ring={p.isYou ? 'gold' : 'dim'} />
+              <span className="font-semibold text-gold-50">{splitRiotId(p.riotId)[0]}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <HexButton onClick={onJoin} disabled={busy || !standby.canJoin}>
+          Entrar na fila
+        </HexButton>
+        <HexButton variant="secondary" onClick={onLeave} disabled={busy}>
+          Sair da espera
+        </HexButton>
+        {!standby.canJoin && <span className="text-sm text-ash">Só o primeiro da espera pode entrar na fila.</span>}
+      </div>
+    </div>
+  )
+}
+
 export default function QueuePanel() {
-  const { snapshot, connected, busy, error, join, leave } = useQueue()
+  const { snapshot, connected, busy, error, join, joinStandby, promote, leave } = useQueue()
 
   return (
     <div className="space-y-4">
       {!snapshot && <p className="text-ash">Conectando à fila...</p>}
 
-      {snapshot?.status === 'idle' && <ModePicker snapshot={snapshot} busy={busy} onJoin={join} />}
+      {snapshot?.status === 'idle' && <ModePicker snapshot={snapshot} busy={busy} onJoin={join} onStandby={joinStandby} />}
+
+      {snapshot?.status === 'standby' && <StandbyView snapshot={snapshot} busy={busy} onJoin={promote} onLeave={leave} />}
 
       {snapshot?.status === 'queued' && (
         <QueuedView snapshot={snapshot} busy={busy} onLeave={leave} onSwitch={join} />

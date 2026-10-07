@@ -3,7 +3,8 @@ import type { QueueMode } from '../../shared/types/modes'
 export type { QueueMode }
 
 // idle -> queued -> ready_check (fila fechou: aceitar/recusar) -> matched (todos aceitaram: está em um lobby)
-export type QueueStatus = 'idle' | 'queued' | 'ready_check' | 'matched'
+// standby: está na lista de espera de um modo (fora da fila de verdade; só olha a fila e espera a vez de entrar).
+export type QueueStatus = 'idle' | 'queued' | 'standby' | 'ready_check' | 'matched'
 
 export interface QueuePlayer {
   userId: number
@@ -32,6 +33,15 @@ export interface QueueSnapshot {
   sizes: Record<QueueMode, number> // quantos esperam em cada fila (para os botões de entrar)
   required: number
   players: { userId: number; riotId: string; iconId: number; isYou: boolean }[]
+  // Lista de espera (até `standbyMax` por modo): quem está nela vê a fila e o primeiro pode entrar na fila de verdade.
+  standbySizes: Record<QueueMode, number>
+  standbyMax: number
+  standby: {
+    position: number // 1 = o primeiro da espera
+    size: number
+    canJoin: boolean // só o primeiro pode entrar na fila
+    players: { userId: number; riotId: string; iconId: number; isYou: boolean }[]
+  } | null
   readyCheck: {
     endsAt: number
     durationMs: number

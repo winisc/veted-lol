@@ -21,12 +21,21 @@ export interface DroppedPlayer {
 
 export interface QueueSnapshot {
   // ready_check = a fila fechou e o jogador precisa aceitar a partida
-  status: 'idle' | 'queued' | 'ready_check' | 'matched'
+  status: 'idle' | 'queued' | 'standby' | 'ready_check' | 'matched'
   mode: QueueMode | null // fila (ou confirmação) em que o jogador está
   size: number // jogadores na fila do modo do jogador
   sizes: Record<QueueMode, number> // quantos esperam em cada fila
   required: number
   players: { userId?: number; riotId: string; iconId: number; isYou: boolean }[]
+  // Lista de espera (ausente em servidores antigos)
+  standbySizes?: Record<QueueMode, number>
+  standbyMax?: number
+  standby?: {
+    position: number // 1 = o primeiro da espera
+    size: number
+    canJoin: boolean // só o primeiro pode entrar na fila
+    players: { userId: number; riotId: string; iconId: number; isYou: boolean }[]
+  } | null
   readyCheck: ReadyCheckInfo | null
   notice?: string
   dropped?: DroppedPlayer[]
@@ -45,6 +54,8 @@ interface QueueContextValue {
   rolesRequired: boolean // tentou entrar na fila sem as roles salvas no perfil
   dismissRolesRequired: () => void
   join: (mode: QueueMode) => Promise<void>
+  joinStandby: (mode: QueueMode) => Promise<void>
+  promote: () => Promise<void> // o primeiro da espera entra na fila de verdade
   leave: () => Promise<void>
   accept: () => Promise<void>
   decline: () => Promise<void>
@@ -120,6 +131,11 @@ export function QueueProvider({ children }: { children: ReactNode }) {
       join: (mode) => {
         askPermissionOnJoin() // precisa de um clique: este é o momento certo de pedir
         return run('/queue/join', { mode })
+      },
+      joinStandby: (mode) => run('/queue/standby', { mode }),
+      promote: () => {
+        askPermissionOnJoin() // vai entrar na fila: mesmo momento de pedir a permissão das notificações
+        return run('/queue/standby/promote')
       },
       leave: () => run('/queue/leave'),
       accept: () => run('/queue/accept'),

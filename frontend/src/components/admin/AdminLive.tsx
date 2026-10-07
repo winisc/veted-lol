@@ -23,6 +23,7 @@ interface LiveResponse {
   queue: {
     required: number
     waiting: (Player & { mode: QueueMode })[]
+    standby?: (Player & { mode: QueueMode })[]
     readyChecks: { id: string; mode: QueueMode; endsAt: number; players: (Player & { accepted: boolean })[] }[]
   }
   lobbies: {
@@ -121,6 +122,27 @@ export default function AdminLive() {
                   </li>
                 ))}
               </ol>
+            )}
+
+            {queue.standby && queue.standby.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-ash">Lista de espera ({queue.standby.length})</p>
+                <ol className="space-y-1.5">
+                  {queue.standby.map((p, i) => (
+                    <li key={p.id} className="flex items-center gap-2">
+                      <span className="w-5 text-right font-cond text-sm text-ash-dim">{i + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <PlayerChip player={p}>
+                          <span className="ml-auto text-[11px] text-ash">{queueModes[p.mode].short}</span>
+                        </PlayerChip>
+                      </div>
+                      <RowAction disabled={busy} onClick={() => setPending({ kind: 'remove', player: p })}>
+                        Tirar
+                      </RowAction>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             )}
 
             {queue.readyChecks.map((check) => (
@@ -269,7 +291,7 @@ export default function AdminLive() {
         onCancel={close}
         onConfirm={() => act(() => api('/admin/queue/clear', { method: 'POST' }), 'Fila esvaziada.')}
       >
-        <p className="text-sm text-ash">Todos que estão esperando saem da fila. Confirmações em andamento continuam.</p>
+        <p className="text-sm text-ash">Todos que estão esperando saem da fila e da lista de espera. Confirmações em andamento continuam.</p>
       </ConfirmDialog>
 
       <ConfirmDialog
