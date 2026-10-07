@@ -18,8 +18,24 @@ function closeSeason(season: Season) {
   seasonRepository.close(season.id)
 }
 
+// A primeira versão numerava a tabela antiga como season 0 e a primeira season como 1. Se o banco já foi criado assim,
+// desloca tudo para a numeração atual (0 -> 6, 1 -> 7...), incluindo a season de cada partida e as tabelas congeladas.
+function migrateOldNumbering() {
+  if (!db.prepare('SELECT 1 FROM seasons WHERE id = 0').get()) return
+  const BIG = 1_000_000 // passa por um número alto para os ids novos não esbarrarem nos antigos (chave primária)
+  db.transaction(() => {
+    for (const [table, column] of [['seasons', 'id'], ['season_standings', 'season_id']] as const) {
+      db.prepare(`UPDATE ${table} SET ${column} = ${column} + ?`).run(BIG)
+      db.prepare(`UPDATE ${table} SET ${column} = ${column} - ? + ?`).run(BIG, LEGACY_SEASON_ID)
+    }
+    db.prepare('UPDATE matches SET season_id = season_id + ? WHERE season_id IS NOT NULL').run(LEGACY_SEASON_ID)
+  })()
+  console.log(`Seasons renumeradas: a tabela antiga agora é a season ${LEGACY_SEASON_ID}.`)
+}
+
 // Garante que existe uma season atual e fecha as que já passaram do prazo. Barato: serve para chamar a cada leitura.
 export function ensureSeasons(now = Date.now()): Season {
+  migrateOldNumbering()
   let current: Season | null = seasonRepository.current()
 
   db.transaction(() => {

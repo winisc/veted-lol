@@ -1,6 +1,5 @@
 import { formatDate } from '../lib/format'
 import { zones, type Zone } from '../lib/zones'
-import Panel from './ui/Panel'
 
 export interface SeasonResult {
   id: number
@@ -15,44 +14,42 @@ export interface SeasonResult {
   rankedPlayers: number
 }
 
-const seasonName = (s: SeasonResult) => `Season ${s.id}`
-
-// Posição do jogador em cada season: a atual (em andamento) e as encerradas, com a classificação final guardada.
+// Posição do jogador em cada season, em fichas pequenas (cabem no banner do perfil): a atual em andamento e as
+// encerradas com a classificação final guardada. O tooltip mostra o período e os detalhes.
 export default function ProfileSeasons({ seasons }: { seasons: SeasonResult[] }) {
   return (
-    <Panel title="Seasons" bodyClassName="p-3">
-      <ul className="grid gap-1.5 sm:grid-cols-2">
-        {seasons.map((s) => {
-          const zone = s.zone ? zones[s.zone] : null
-          return (
-            <li key={s.id} className="flex items-center gap-3 rounded-md bg-panel px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 text-sm font-semibold text-gold-50">
-                  {seasonName(s)}
-                  {s.current && <span className="rounded bg-hex-300/15 px-1.5 py-0.5 text-[11px] text-hex-300">em andamento</span>}
-                </p>
-                <p className="truncate text-xs text-ash">
-                  {s.legacy ? `até ${formatDate(s.endsAt)}` : `${formatDate(s.startsAt)} a ${formatDate(s.endsAt)}`}
-                </p>
-              </div>
+    <ul className="mt-2 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start" aria-label="Seasons">
+      {seasons.map((s) => {
+        const zone = s.zone ? zones[s.zone] : null
+        const period = s.legacy ? `até ${formatDate(s.endsAt)}` : `${formatDate(s.startsAt)} a ${formatDate(s.endsAt)}`
+        const detail =
+          s.position !== null
+            ? `#${s.position} de ${s.rankedPlayers} · ${s.points} pts · ${s.games} ${s.games === 1 ? 'jogo' : 'jogos'}`
+            : s.current
+              ? 'sem jogos ainda'
+              : 'não jogou'
 
-              {s.position !== null && zone ? (
-                <div className="shrink-0 text-right">
-                  <p className={`font-cond text-2xl font-bold leading-none tabular-nums ${zone.text}`}>
-                    #{s.position}
-                    <span className="ml-1 font-sans text-xs font-normal text-ash">de {s.rankedPlayers}</span>
-                  </p>
-                  <p className="mt-0.5 text-xs text-ash">
-                    {s.points} pts · {s.games} {s.games === 1 ? 'jogo' : 'jogos'}
-                  </p>
-                </div>
-              ) : (
-                <p className="shrink-0 text-xs text-ash-dim">{s.current ? 'Sem jogos ainda' : 'Não jogou'}</p>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-    </Panel>
+        return (
+          <li
+            key={s.id}
+            title={`Season ${s.id}${s.current ? ' (em andamento)' : ''} · ${period} · ${detail}`}
+            className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
+              s.current ? 'border-hex-300/40 bg-hex-300/10' : 'border-rim bg-abyss/70'
+            }`}
+          >
+            <span className="font-semibold text-gold-50">Season {s.id}</span>
+            {s.position !== null && zone ? (
+              <>
+                <span className={`font-cond text-sm font-bold tabular-nums ${zone.text}`}>#{s.position}</span>
+                <span className="text-ash">{s.points} pts</span>
+              </>
+            ) : (
+              <span className={s.current ? 'text-hex-300' : 'text-ash-dim'}>{s.current ? 'em andamento' : 'não jogou'}</span>
+            )}
+            {s.current && s.position !== null && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-hex-300" aria-label="em andamento" />}
+          </li>
+        )
+      })}
+    </ul>
   )
 }

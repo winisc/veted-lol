@@ -142,6 +142,7 @@ export default function Profile() {
             <p className="text-lg text-ash">#{tag}</p>
             <p className="mt-1 text-sm text-ash">Jogando desde {formatDate(user.createdAt)}</p>
             <ProfileRoles key={user.id} initial={user.roles} tour={rolesTour && !viewingOther} onSaved={endTour} readOnly={viewingOther} />
+            {seasons && seasons.length > 0 && <ProfileSeasons seasons={seasons} />}
           </div>
           <div className="flex flex-col items-center gap-2 sm:items-end">
             {stats.rank && zone ? (
@@ -160,8 +161,6 @@ export default function Profile() {
           </div>
         </div>
       </section>
-
-      {seasons && seasons.length > 0 && <ProfileSeasons seasons={seasons} />}
 
       <Panel
         title={season ? `Estatísticas · Season ${season.id}` : 'Estatísticas'}
