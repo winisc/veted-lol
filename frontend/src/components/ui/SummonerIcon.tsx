@@ -1,5 +1,8 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { iconUrl } from '../../lib/ddragon'
+
+// Ícone de invocador padrão do LoL (o 29), guardado no próprio site: aparece mesmo se o CDN dos ícones falhar.
+const DEFAULT_ICON = '/default-icon.jpg'
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 export type IconRing = 'gold' | 'blue' | 'red' | 'cyan' | 'bagre' | 'dim'
@@ -34,18 +37,23 @@ interface Props {
 
 export default function SummonerIcon({ iconId, size = 'md', ring = 'dim', badge, className = '' }: Props) {
   const thick = size === 'xl' || size === '2xl' ? 'p-[3px]' : 'p-[2px]'
+  // Ícone que não carregou (CDN fora do ar, id sem imagem): mostra o ícone padrão do LoL (public/default-icon.jpg, hospedado aqui) em vez de um círculo vazio.
+  const [failedId, setFailedId] = useState<number | null>(null)
+  const failed = failedId === iconId
 
   return (
     <span className={`relative inline-block shrink-0 rounded-full ${thick} ${rings[ring]} ${sizes[size]} ${className}`}>
-      <img
-        src={iconUrl(iconId)}
-        alt=""
-        loading="lazy"
-        className="h-full w-full rounded-full bg-panel object-cover"
-        onError={(e) => {
-          e.currentTarget.style.visibility = 'hidden'
-        }}
-      />
+      {failed ? (
+        <img src={DEFAULT_ICON} alt="" className="h-full w-full rounded-full bg-panel object-cover" />
+      ) : (
+        <img
+          src={iconUrl(iconId)}
+          alt=""
+          loading="lazy"
+          className="h-full w-full rounded-full bg-panel object-cover"
+          onError={() => setFailedId(iconId)}
+        />
+      )}
       {badge && <span className="absolute -bottom-2 left-1/2 -translate-x-1/2">{badge}</span>}
     </span>
   )

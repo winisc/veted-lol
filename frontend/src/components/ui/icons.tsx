@@ -40,6 +40,23 @@ export function LogoutIcon({ className = 'h-5 w-5' }: Props) {
   )
 }
 
+// Brasão de ranked: escudo com um losango no centro (a cor vem do texto).
+export function EmblemIcon({ className = 'h-4 w-4' }: Props) {
+  return (
+    <svg viewBox="0 0 24 24" className={`${base} ${className}`} aria-hidden="true">
+      <path
+        d="M12 2 4 5.5v6.2c0 5 3.4 8.6 8 10.3 4.6-1.7 8-5.3 8-10.3V5.5L12 2Z"
+        fill="currentColor"
+        fillOpacity="0.22"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M12 7.5 15.5 12 12 16.5 8.5 12 12 7.5Z" fill="currentColor" />
+    </svg>
+  )
+}
+
 export function ShieldIcon({ className = 'h-5 w-5' }: Props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className={`${base} ${className}`} aria-hidden="true">

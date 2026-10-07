@@ -281,7 +281,8 @@ export default function Ranking() {
       {seasons && seasons.length > 1 && (
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Seasons">
           {seasons.map((s) => {
-            const active = (season?.id ?? seasons[0].id) === s.id;
+            // Marca o botão clicado na hora, sem esperar a tabela nova chegar.
+            const active = seasonId === null ? s.current : s.id === seasonId;
             return (
               <button
                 key={s.id}
@@ -300,9 +301,17 @@ export default function Ranking() {
               </button>
             );
           })}
+          {loading && (
+            <span role="status" className="flex items-center gap-2 px-2 text-sm text-ash">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-rim border-t-gold-200" aria-hidden="true" />
+              Carregando...
+            </span>
+          )}
         </div>
       )}
 
+      {/* Enquanto a outra season carrega, a tabela anterior fica esmaecida (e sem cliques) em vez de parecer travada. */}
+      <div aria-busy={loading} className={`space-y-6 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-40" : ""}`}>
       {ranking.length === 0 ? (
         <p className="border border-dashed border-rim px-4 py-12 text-center text-ash">
           {past
@@ -426,6 +435,7 @@ export default function Ranking() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }
