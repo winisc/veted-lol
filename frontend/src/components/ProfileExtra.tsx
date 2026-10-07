@@ -87,13 +87,13 @@ function Sparkline({ values, up }: { values: number[]; up: boolean }) {
 }
 
 // Estatísticas a mais do perfil: como capitão, sequências e adversários mais marcantes.
-export default function ProfileExtra({ extra, evolution }: { extra: ProfileExtraData; evolution?: number[] }) {
+export default function ProfileExtra({ extra, evolution, seasonId }: { extra: ProfileExtraData; evolution?: number[]; seasonId?: number }) {
   const { captain, streaks, rivals, duos } = extra
   const { current } = streaks
   const delta = evolution && evolution.length >= 3 ? evolution[evolution.length - 1] - evolution[0] : null
 
   return (
-    <Panel title="Mais estatísticas" bodyClassName="p-3">
+    <Panel title={seasonId === undefined ? 'Mais estatísticas' : `Mais estatísticas · Season ${seasonId}`} bodyClassName="p-3">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Card
           label="Como capitão"
@@ -158,7 +158,7 @@ export default function ProfileExtra({ extra, evolution }: { extra: ProfileExtra
       </div>
       <p className="mt-2 px-1 text-xs text-ash-dim">
         Duo é quem joga no mesmo time que você; freguês e carrasco, no time contrário. Precisam de pelo menos 2 partidas e
-        saldo de um lado só.
+        saldo de um lado só. Tudo aqui recomeça a cada season.
       </p>
     </Panel>
   )

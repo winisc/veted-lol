@@ -53,14 +53,14 @@ function bestAndWorst(all: Rival[]) {
 }
 
 // "Freguês" é quem o jogador mais vence e "carrasco" é quem mais vence o jogador (times opostos).
-function rivals(userId: number) {
-  const { best, worst } = bestAndWorst(matchRepository.headToHead(userId))
+function rivals(userId: number, seasonId: number) {
+  const { best, worst } = bestAndWorst(matchRepository.headToHead(userId, seasonId))
   return { victim: best, nemesis: worst }
 }
 
 // Duos: o parceiro com quem o jogador mais ganha e o parceiro com quem mais perde (mesmo time).
-function duos(userId: number) {
-  return bestAndWorst(matchRepository.withTeammates(userId))
+function duos(userId: number, seasonId: number) {
+  return bestAndWorst(matchRepository.withTeammates(userId, seasonId))
 }
 
 export const profileService = {
@@ -88,7 +88,8 @@ export const profileService = {
         rankedPlayers: s.id === season.id ? ranking.length : seasonRepository.standings(s.id).length,
       }
     })
-    const captain = matchRepository.captainStats(userId)
+    // As estatísticas extras (capitão, sequências, duos, freguês e carrasco) também recomeçam a cada season.
+    const captain = matchRepository.captainStats(userId, season.id)
 
     return {
       user: {
@@ -117,9 +118,9 @@ export const profileService = {
           ...captain,
           winRate: winRate(captain.wins, captain.games - captain.wins),
         },
-        streaks: streaks(matchRepository.resultsForUser(userId)),
-        rivals: rivals(userId),
-        duos: duos(userId),
+        streaks: streaks(matchRepository.resultsForUser(userId, season.id)),
+        rivals: rivals(userId, season.id),
+        duos: duos(userId, season.id),
       },
       history: matchRepository.historyForUser(userId, HISTORY_LIMIT).map((match) => ({
         ...match,

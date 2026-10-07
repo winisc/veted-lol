@@ -296,6 +296,7 @@ export default function Profile() {
       {extra && (
         <ProfileExtra
           extra={extra}
+          seasonId={season?.id}
           // Os pontos são da season atual: a curva só usa as partidas dela.
           evolution={pointsEvolution(
             season ? history.filter((m) => m.seasonId === season.id) : history,
