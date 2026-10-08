@@ -1,5 +1,6 @@
 import type { LobbySnapshot } from '../hooks/useLobby'
 import { short } from '../lib/teams'
+import LobbyPlayers from './LobbyPlayers'
 import PhaseTimer from './PhaseTimer'
 import SectionTitle from './ui/SectionTitle'
 import SummonerIcon from './ui/SummonerIcon'
@@ -67,6 +68,8 @@ export default function LobbyOrder({ lobby, skew, busy, onChoose }: Props) {
           </div>
         )
       )}
+
+      <LobbyPlayers lobby={lobby} />
     </div>
   )
 }

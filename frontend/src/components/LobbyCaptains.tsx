@@ -1,5 +1,6 @@
 import type { LobbyPlayer, LobbySnapshot } from '../hooks/useLobby'
 import { splitRiotId } from '../lib/teams'
+import LobbyPlayers, { rankLabel } from './LobbyPlayers'
 import PhaseTimer from './PhaseTimer'
 import { CrownMedal, YouBadge } from './ui/Badges'
 import PlayerLink from './ui/PlayerLink'
@@ -8,10 +9,6 @@ import SummonerIcon from './ui/SummonerIcon'
 
 function voteLabel(votes: number | null) {
   return votes === 1 ? '1 voto' : `${votes ?? 0} votos`
-}
-
-function rankLabel(position: number | null) {
-  return position === null ? 'Sem posição' : `#${position} na tabela`
 }
 
 // Quem tem posição na tabela vem primeiro (da melhor para a pior); quem não tem fica no fim.
@@ -78,24 +75,7 @@ export default function LobbyCaptains({ lobby, skew }: { lobby: LobbySnapshot; s
         <h3 className="mb-2 font-display text-base text-gold-50">
           {ranked ? 'Posição dos demais na tabela' : 'Votos dos demais'}
         </h3>
-        <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-          {others.map((player) => (
-            <li
-              key={player.id}
-              className={`flex items-center gap-2 rounded-md border px-2 py-1 ${
-                player.isYou ? 'border-gold-200/40 bg-gold-200/6' : 'border-transparent bg-panel'
-              }`}
-            >
-              <SummonerIcon iconId={player.iconId} size="xs" ring="dim" />
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gold-50">
-                <PlayerLink userId={player.id} newTab>
-                  {splitRiotId(player.riotId)[0]}
-                </PlayerLink>
-              </span>
-              <span className="font-cond text-sm font-semibold tabular-nums text-ash">{detail(player)}</span>
-            </li>
-          ))}
-        </ul>
+        <LobbyPlayers lobby={lobby} players={others} detail={detail} />
       </div>
     </div>
   )
