@@ -4,11 +4,11 @@ import { buildRanking } from '../ranking/ranking.builder'
 import { LEGACY_SEASON_ID } from './season.constants'
 import { seasonRepository, type Season } from './season.repository'
 
-// Cada season dura SEASON_DAYS dias (padrão 7). Quando uma acaba, a tabela dela é congelada e a próxima começa
+// Cada season dura SEASON_DAYS dias (padrão 15). Quando uma acaba, a tabela dela é congelada e a próxima começa
 // no mesmo instante. A primeira season (a 7) começa na primeira vez que o servidor sobe com este código; tudo o que
 // existia antes vira a season 6 (a tabela antiga).
 const DAY_MS = 24 * 60 * 60 * 1000
-const SEASON_MS = Math.max(1, Number(process.env.SEASON_DAYS) || 7) * DAY_MS
+const SEASON_MS = Math.max(1, Number(process.env.SEASON_DAYS) || 15) * DAY_MS
 const EPOCH = new Date(0).toISOString()
 const CHECK_EVERY_MS = 60_000
 
@@ -48,6 +48,16 @@ export function ensureSeasons(now = Date.now()): Season {
       current = { id: LEGACY_SEASON_ID + 1, startsAt, endsAt: new Date(now + SEASON_MS).toISOString(), closed: false }
       seasonRepository.create(current)
       console.log(`Seasons ativadas: a tabela antiga virou a season ${LEGACY_SEASON_ID} e a season ${current.id} começou agora.`)
+    }
+
+    // Mudou a duração das seasons (SEASON_DAYS): a season aberta passa a acabar na nova data, contada do início dela.
+    // Só mexe quando ela foi criada com outra duração em dias inteiros (um fim ajustado à mão fica como está).
+    const length = Date.parse(current.endsAt) - Date.parse(current.startsAt)
+    const wantedEnd = new Date(Date.parse(current.startsAt) + SEASON_MS).toISOString()
+    if (length !== SEASON_MS && length % DAY_MS === 0) {
+      seasonRepository.setEndsAt(current.id, wantedEnd)
+      current = { ...current, endsAt: wantedEnd }
+      console.log(`Season ${current.id} agora termina em ${wantedEnd}.`)
     }
 
     // Prazo vencido: fecha e abre a próxima, começando exatamente quando a anterior acabou (sem deslizar o relógio).

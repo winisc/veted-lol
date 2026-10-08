@@ -30,6 +30,7 @@ export interface QueueSnapshot {
   // Lista de espera (ausente em servidores antigos)
   standbySizes?: Record<QueueMode, number>
   standbyMax?: number
+  standbyPlayers?: { userId: number; riotId: string; iconId: number }[] // na fila: a lista de espera do modo
   standby?: {
     position: number // 1 = o primeiro da espera
     size: number

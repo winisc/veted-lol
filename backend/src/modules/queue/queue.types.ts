@@ -36,6 +36,8 @@ export interface QueueSnapshot {
   // Lista de espera (até `standbyMax` por modo): quem está nela vê a fila e o primeiro pode entrar na fila de verdade.
   standbySizes: Record<QueueMode, number>
   standbyMax: number
+  // Quem está na fila também vê a lista de espera do modo dela (vazia nos outros casos).
+  standbyPlayers: { userId: number; riotId: string; iconId: number }[]
   standby: {
     position: number // 1 = o primeiro da espera
     size: number

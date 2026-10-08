@@ -83,12 +83,11 @@ export const riotService = {
     return account.puuid
   },
 
-  // Liga do jogador: solo/duo se tiver, senão flex. null = sem rank (unranked).
+  // Liga do jogador: só a solo/duo conta (flex é ignorada). null = sem rank na solo/duo.
   async rankOf(puuid: string): Promise<{ tier: string; rank: string; leaguePoints: number; wins: number; losses: number; queue: 'solo' | 'flex' } | null> {
     const entries = await riotFetch<RiotLeagueEntryDto[]>(`${PLATFORM_HOST}/lol/league/v4/entries/by-puuid/${puuid}`)
     const solo = entries.find((e) => e.queueType === 'RANKED_SOLO_5x5')
-    const flex = entries.find((e) => e.queueType === 'RANKED_FLEX_SR')
-    const entry = solo ?? flex
+    const entry = solo
     if (!entry) return null
     return {
       tier: entry.tier,
@@ -96,7 +95,7 @@ export const riotService = {
       leaguePoints: entry.leaguePoints,
       wins: entry.wins,
       losses: entry.losses,
-      queue: solo ? 'solo' : 'flex',
+      queue: 'solo',
     }
   },
 

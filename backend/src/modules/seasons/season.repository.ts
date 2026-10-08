@@ -46,6 +46,10 @@ export const seasonRepository = {
     db.prepare('UPDATE seasons SET closed = 1 WHERE id = ?').run(id)
   },
 
+  setEndsAt(id: number, endsAt: string) {
+    db.prepare('UPDATE seasons SET ends_at = ? WHERE id = ?').run(endsAt, id)
+  },
+
   // Seasons encerradas que tiveram pelo menos um jogador na tabela, da mais recente para a mais antiga.
   closedWithStandings(): Season[] {
     const rows = db

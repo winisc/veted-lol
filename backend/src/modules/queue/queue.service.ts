@@ -70,6 +70,7 @@ function snapshot(userId: number, notice?: string, dropped?: QueueSnapshot['drop
     dropped,
     standbySizes: queueRepository.standbySizes(),
     standbyMax: STANDBY_MAX,
+    standbyPlayers: [],
     standby: null,
   }
   const queuePlayers = (mode: QueueMode) =>
@@ -122,6 +123,9 @@ function snapshot(userId: number, notice?: string, dropped?: QueueSnapshot['drop
     ...base,
     status: mode ? 'queued' : 'idle',
     mode,
+    standbyPlayers: mode
+      ? queueRepository.listStandby(mode).map((p) => ({ userId: p.userId, riotId: p.riotId, iconId: p.iconId }))
+      : [],
     size: mode ? sizes[mode] : 0,
     players: mode
       ? queueRepository

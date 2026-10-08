@@ -104,6 +104,11 @@ function QueuedView({ snapshot, busy, onLeave, onStandby }: QueuedViewProps) {
 
       <QueueSlots snapshot={snapshot} />
 
+      {/* Quem está esperando uma vaga neste modo */}
+      {(snapshot.standbyPlayers?.length ?? 0) > 0 && (
+        <StandbyList players={snapshot.standbyPlayers!} max={snapshot.standbyMax} />
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <HexButton variant="secondary" onClick={onLeave} disabled={busy}>
           Sair da fila
@@ -197,6 +202,37 @@ function ModePicker({
   )
 }
 
+// A ordem da lista de espera (quem está nela, do 1º ao último).
+function StandbyList({
+  players,
+  max,
+}: {
+  players: { userId: number; riotId: string; iconId: number; isYou?: boolean }[]
+  max?: number
+}) {
+  return (
+    <div>
+      <p className="mb-1.5 text-xs font-semibold text-ash">
+        Lista de espera ({players.length}/{max ?? players.length})
+      </p>
+      <ol className="flex flex-wrap gap-1.5">
+        {players.map((p, i) => (
+          <li
+            key={p.userId}
+            className={`flex items-center gap-1.5 rounded-md border py-1 pl-1.5 pr-2.5 text-sm ${
+              p.isYou ? 'border-gold-200/40 bg-gold-200/10' : 'border-rim bg-panel'
+            }`}
+          >
+            <span className="font-cond text-sm font-bold tabular-nums text-ash">{i + 1}º</span>
+            <SummonerIcon iconId={p.iconId} size="xs" ring={p.isYou ? 'gold' : 'dim'} />
+            <span className="font-semibold text-gold-50">{splitRiotId(p.riotId)[0]}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 // Na lista de espera: o jogador não está na fila, só vê a fila do modo e a ordem da espera. O primeiro pode entrar.
 function StandbyView({ snapshot, busy, onJoin, onLeave }: { snapshot: QueueSnapshot; busy: boolean; onJoin: () => void; onLeave: () => void }) {
   const mode = snapshot.mode ?? 'vote'
@@ -228,26 +264,7 @@ function StandbyView({ snapshot, busy, onJoin, onLeave }: { snapshot: QueueSnaps
 
       <QueueSlots snapshot={snapshot} />
 
-      {/* A ordem da espera */}
-      <div>
-        <p className="mb-1.5 text-xs font-semibold text-ash">
-          Lista de espera ({standby.size}/{snapshot.standbyMax})
-        </p>
-        <ol className="flex flex-wrap gap-1.5">
-          {standby.players.map((p, i) => (
-            <li
-              key={p.userId}
-              className={`flex items-center gap-1.5 rounded-md border py-1 pl-1.5 pr-2.5 text-sm ${
-                p.isYou ? 'border-gold-200/40 bg-gold-200/10' : 'border-rim bg-panel'
-              }`}
-            >
-              <span className="font-cond text-sm font-bold tabular-nums text-ash">{i + 1}º</span>
-              <SummonerIcon iconId={p.iconId} size="xs" ring={p.isYou ? 'gold' : 'dim'} />
-              <span className="font-semibold text-gold-50">{splitRiotId(p.riotId)[0]}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
+      <StandbyList players={standby.players} max={snapshot.standbyMax} />
 
       <div className="flex flex-wrap items-center gap-3">
         <HexButton onClick={onJoin} disabled={busy || !standby.canJoin}>
