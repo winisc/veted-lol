@@ -17,6 +17,7 @@ export interface RankingEntry {
   winRate: number | null
   mvps: number
   bagres: number
+  streak?: number // sequência atual (+ vitórias, - derrotas seguidas); só na season atual
 }
 
 // Ordem: mais pontos, depois melhor win rate, mais vitórias, mais MVPs, menos bagres e, por fim, nome.

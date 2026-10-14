@@ -2,6 +2,7 @@ import type { LobbyPlayer, LobbySnapshot } from '../hooks/useLobby'
 import { splitRiotId } from '../lib/teams'
 import { CrownIcon } from './ui/icons'
 import PlayerLink from './ui/PlayerLink'
+import StreakBadge from './ui/StreakBadge'
 import SummonerIcon from './ui/SummonerIcon'
 
 export function rankLabel(position: number | null) {
@@ -43,6 +44,7 @@ export default function LobbyPlayers({
                   </PlayerLink>
                 </span>
                 <CrownIcon className="h-3.5 w-3.5 shrink-0 text-gold-200" />
+                <StreakBadge streak={captain.streak} />
                 <span className="font-cond text-sm font-semibold tabular-nums text-ash">{detail(captain)}</span>
               </div>
             </div>
@@ -71,6 +73,7 @@ export default function LobbyPlayers({
               </PlayerLink>
             </span>
             {lobby.captains.includes(player.id) && <CrownIcon className="h-3.5 w-3.5 shrink-0 text-gold-200" />}
+            <StreakBadge streak={player.streak} />
           </span>
           <span className="font-cond text-sm font-semibold tabular-nums text-ash">{detail(player)}</span>
         </li>

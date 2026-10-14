@@ -3,6 +3,7 @@ import { YouBadge } from "../components/ui/Badges";
 import Notice from "../components/ui/Notice";
 import PageHero from "../components/ui/PageHero";
 import PlayerLink from "../components/ui/PlayerLink";
+import StreakBadge from "../components/ui/StreakBadge";
 import ScoringRules from "../components/ui/ScoringRules";
 import SummonerIcon from "../components/ui/SummonerIcon";
 import { CrownIcon, FishIcon, StarIcon } from "../components/ui/icons";
@@ -27,6 +28,7 @@ interface RankingEntry {
   winRate: number | null;
   mvps: number;
   bagres: number;
+  streak?: number; // sequência atual (só na season atual)
 }
 
 interface SeasonInfo {
@@ -97,6 +99,7 @@ function Podium({ top, myId }: { top: RankingEntry[]; myId?: number }) {
               <p className="flex items-center gap-1.5 truncate font-display text-lg leading-tight text-gold-50">
                 {first && <CrownIcon className="h-4 w-4 shrink-0 text-gold-200" />}
                 <PlayerLink userId={entry.userId} className="truncate">{name}</PlayerLink>
+                <StreakBadge streak={entry.streak} />
               </p>
               <p className="flex items-center gap-2 text-xs text-ash">
                 <span>#{tag}</span>
@@ -395,6 +398,7 @@ export default function Ranking() {
                                     className={`flex items-center gap-2 truncate text-gold-50 ${isMe ? "font-bold" : "font-semibold"}`}
                                   >
                                     <PlayerLink userId={entry.userId} className="truncate">{name}</PlayerLink>
+                                    <StreakBadge streak={entry.streak} />
                                     {isMe && <YouBadge />}
                                   </p>
                                   <p className="text-xs text-ash">#{tag}</p>

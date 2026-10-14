@@ -7,6 +7,7 @@ import { ReactionBubble } from './Reactions'
 import WinChanceBar from './WinChanceBar'
 import PlayerRow from './ui/PlayerRow'
 import RankBadge from './ui/RankBadge'
+import StreakBadge from './ui/StreakBadge'
 import EloBadge from './ui/EloBadge'
 import RoleIcons from './ui/RoleIcons'
 import SummonerIcon from './ui/SummonerIcon'
@@ -113,7 +114,12 @@ export default function LobbyDraft({ lobby, skew, busy, onPick }: Props) {
                       meta={player.elo ? <EloBadge elo={player.elo} compact /> : undefined}
                       iconBadge={<RankBadge position={player.rankPosition} overlay />}
                       maxNameChars={12}
-                      badges={player.isYou && <YouBadge />}
+                      badges={
+                        <>
+                          <StreakBadge streak={player.streak} />
+                          {player.isYou && <YouBadge />}
+                        </>
+                      }
                       right={<RoleIcons roles={player.roles} />}
                     />
                   </li>

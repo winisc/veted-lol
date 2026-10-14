@@ -33,6 +33,7 @@ export interface LobbyPlayer {
   team: Side | null
   rankPosition: number | null // posição na tabela quando o lobby abriu (null = sem partidas)
   rankPoints?: number | null // pontos na season atual (null = sem partidas; ausente em servidores antigos)
+  streak?: number // sequência quando o lobby abriu (+ vitórias, - derrotas seguidas)
   roles?: PlayerRoles // roles do perfil (ausente em servidores antigos)
   elo?: PlayerElo | null // elo do LoL (null = sem rank; ausente em servidores antigos)
 }

@@ -386,6 +386,8 @@ export const lobbyService = {
     const rankPoints = new Map(
       players.map((p) => [p.userId, ranking.find((e) => e.userId === p.userId)?.points ?? null] as const),
     )
+    const allStreaks = matchRepository.streaks()
+    const streaks = new Map(players.map((p) => [p.userId, allStreaks.get(p.userId) ?? 0] as const))
     // Início de season: quase ninguém tem posição ainda. Para o modo tabela não virar sorteio puro, quem não jogou na
     // season atual entra pela posição da anterior, atrás de todos os que já têm posição agora.
     const previous = seasonService.previousPositions()
@@ -406,6 +408,7 @@ export const lobbyService = {
       mode,
       rankPositions,
       rankPoints,
+      streaks,
       seedPositions,
       roles,
       players,

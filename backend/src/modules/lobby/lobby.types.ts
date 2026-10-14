@@ -41,6 +41,7 @@ export interface Lobby {
   mode: QueueMode // vote: capitães por votação · ranked: os 2 melhores da tabela
   rankPositions: Map<number, number | null> // posição de cada jogador na tabela (season atual) quando o lobby abriu
   rankPoints?: Map<number, number | null> // pontos de cada jogador na season atual (para a chance estimada de vitória)
+  streaks?: Map<number, number> // sequência de cada jogador quando o lobby abriu (+ vitórias, - derrotas seguidas)
   // Posição usada só para escolher os capitães no modo tabela: quem ainda não jogou na season atual entra pela
   // posição da season anterior, depois de todo mundo que já tem posição. Ausente em lobbies guardados antes disso.
   seedPositions?: Map<number, number | null>
@@ -132,6 +133,7 @@ export interface LobbySnapshot {
     team: Side | null
     rankPosition: number | null // posição na tabela (null = ainda sem partidas)
     rankPoints: number | null // pontos na season atual (null = ainda sem partidas)
+    streak: number // sequência quando o lobby abriu (+ vitórias, - derrotas seguidas, 0 = nenhuma)
     roles: PlayerRoles
     elo: PlayerElo | null // elo do LoL (null = sem rank, ou a Riot não respondeu)
   }[]

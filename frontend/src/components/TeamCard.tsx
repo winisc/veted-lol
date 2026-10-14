@@ -5,6 +5,7 @@ import { useProfilePath } from './ui/PlayerLink'
 import { ReactionBubble } from './Reactions'
 import PlayerRow from './ui/PlayerRow'
 import RankBadge from './ui/RankBadge'
+import StreakBadge from './ui/StreakBadge'
 import EloBadge from './ui/EloBadge'
 import RoleIcons from './ui/RoleIcons'
 
@@ -51,6 +52,7 @@ export default function TeamCard({ side, members, slots, mvpId, bagreId, winner,
                 badges={
                   <>
                     <EloBadge elo={member.elo} compact />
+                    <StreakBadge streak={member.streak} />
                     {member.isCaptain && <CaptainBadge />}
                     {member.id === mvpId && <MvpBadge />}
                     {member.id === bagreId && <BagreBadge />}

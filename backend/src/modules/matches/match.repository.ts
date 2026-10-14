@@ -69,6 +69,30 @@ export const matchRepository = {
     return row
   },
 
+  // Sequência atual de cada jogador (todas as seasons, remakes não contam nem quebram): positivo = vitórias seguidas,
+  // negativo = derrotas seguidas. Quem não tem partidas fica fora do mapa.
+  streaks(): Map<number, number> {
+    const rows = db
+      .prepare(
+        `SELECT mp.user_id AS userId, mp.result AS result
+         FROM match_players mp
+         JOIN matches m ON m.id = mp.match_id
+         WHERE mp.result != 'remake'
+         ORDER BY m.ended_at DESC`,
+      )
+      .all() as { userId: number; result: 'win' | 'loss' }[]
+    const streaks = new Map<number, number>()
+    const closed = new Set<number>() // a sequência deste jogador já acabou (achou um resultado diferente)
+    for (const { userId, result } of rows) {
+      if (closed.has(userId)) continue
+      const step = result === 'win' ? 1 : -1
+      const current = streaks.get(userId) ?? 0
+      if (current === 0 || Math.sign(current) === step) streaks.set(userId, current + step)
+      else closed.add(userId)
+    }
+    return streaks
+  },
+
   // Todos os jogadores com pelo menos uma partida válida (sem remakes). Com `seasonId`, só as dessa season.
   rankingRows(seasonId?: number): RankingRow[] {
     const rows = db

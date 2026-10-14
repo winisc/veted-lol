@@ -35,9 +35,16 @@ export const rankingService = {
       if (!season) throw new AppError('Season não encontrada.', 404)
     }
 
+    // Na season atual, cada um vem com a sequência atual (🔥 vitórias / 🧊 derrotas seguidas).
+    const ranking = getRanking(season.id)
+    if (season.id === current.id) {
+      const streaks = matchRepository.streaks()
+      for (const entry of ranking) entry.streak = streaks.get(entry.userId) ?? 0
+    }
+
     return {
       scoring: scoringFor(season.id), // a pontuação que valia na season mostrada
-      ranking: getRanking(season.id),
+      ranking,
       season: seasonInfo(season, current.id),
       seasons: seasonService.list().map((s) => seasonInfo(s, current.id)),
       now: Date.now(),

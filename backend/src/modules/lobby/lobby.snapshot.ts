@@ -86,6 +86,7 @@ export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
       team: teamOf(lobby, p.userId),
       rankPosition: lobby.rankPositions.get(p.userId) ?? null,
       rankPoints: lobby.rankPoints?.get(p.userId) ?? null,
+      streak: lobby.streaks?.get(p.userId) ?? 0,
       roles: lobby.roles.get(p.userId) ?? { main: null, secondary: null, worst: null },
       elo: eloService.cached(p.userId) ?? null,
     })),

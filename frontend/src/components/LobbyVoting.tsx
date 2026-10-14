@@ -4,6 +4,7 @@ import { splitRiotId } from '../lib/teams'
 import PhaseTimer from './PhaseTimer'
 import { YouBadge } from './ui/Badges'
 import RankBadge from './ui/RankBadge'
+import StreakBadge from './ui/StreakBadge'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { CheckIcon } from './ui/icons'
 import PlayerTile from './ui/PlayerTile'
@@ -61,8 +62,9 @@ export default function LobbyVoting({ lobby, skew, busy, onVote }: Props) {
                 disabled={busy}
                 iconBadge={<RankBadge position={player.rankPosition} overlay />}
                 footer={
-                  (player.isYou || selected) && (
+                  (player.isYou || selected || Math.abs(player.streak ?? 0) >= 3) && (
                     <>
+                      <StreakBadge streak={player.streak} />
                       {player.isYou && <YouBadge />}
                       {selected && <span className="text-xs font-semibold text-gold-200">Seu voto</span>}
                     </>

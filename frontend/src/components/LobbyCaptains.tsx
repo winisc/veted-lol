@@ -5,6 +5,7 @@ import PhaseTimer from './PhaseTimer'
 import { CrownMedal, YouBadge } from './ui/Badges'
 import PlayerLink from './ui/PlayerLink'
 import SectionTitle from './ui/SectionTitle'
+import StreakBadge from './ui/StreakBadge'
 import SummonerIcon from './ui/SummonerIcon'
 
 function voteLabel(votes: number | null) {
@@ -55,6 +56,7 @@ export default function LobbyCaptains({ lobby, skew }: { lobby: LobbySnapshot; s
                   <p className="text-sm text-ash">#{tag}</p>
                   <p className="flex items-center gap-2 font-cond text-base font-semibold text-gold-200">
                     {detail(captain)}
+                    <StreakBadge streak={captain.streak} />
                     {captain.isYou && <YouBadge />}
                   </p>
                 </div>
