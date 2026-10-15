@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'token'
+export const BANNED_EVENT = 'veted:banned'
 
 // Endereço da API. Em desenvolvimento fica vazio e o Vite repassa /api para o backend local.
 // Em produção (ex.: Cloudflare Pages) defina VITE_API_URL no build com a URL pública do backend.
@@ -39,6 +40,10 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   }
 
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new ApiError(data.error ?? 'Erro inesperado.', res.status, data.code)
+  if (!res.ok) {
+    // Banido com a sessão aberta: o app desloga e mostra o aviso na tela de entrar.
+    if (data.code === 'BANNED' && token) window.dispatchEvent(new CustomEvent(BANNED_EVENT))
+    throw new ApiError(data.error ?? 'Erro inesperado.', res.status, data.code)
+  }
   return data as T
 }

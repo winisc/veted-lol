@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, tokenStorage } from '../lib/api'
+import { api, BANNED_EVENT, tokenStorage } from '../lib/api'
 
 export interface User {
   id: number
@@ -19,6 +19,7 @@ interface AuthContextValue {
   login: (riotId: string, password: string) => Promise<void>
   register: (riotId: string, password: string) => Promise<void>
   logout: () => void
+  kickedMessage: string // aviso para a tela de entrar (ex.: a conta foi banida com a sessão aberta)
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -26,6 +27,18 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(() => tokenStorage.get() !== null)
+  const [kickedMessage, setKickedMessage] = useState('')
+
+  // Banido com a sessão aberta: sai da conta na hora.
+  useEffect(() => {
+    const onBanned = () => {
+      tokenStorage.clear()
+      setUser(null)
+      setKickedMessage('Esta conta foi banida.')
+    }
+    window.addEventListener(BANNED_EVENT, onBanned)
+    return () => window.removeEventListener(BANNED_EVENT, onBanned)
+  }, [])
 
   useEffect(() => {
     if (!tokenStorage.get()) return
@@ -51,8 +64,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         tokenStorage.clear()
         setUser(null)
       },
+      kickedMessage,
     }),
-    [user, loading, authenticate],
+    [user, loading, authenticate, kickedMessage],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

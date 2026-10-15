@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { AppError } from '../../shared/errors/AppError'
 import { signToken } from '../../shared/utils/jwt'
 import { formatRiotId, parseRiotId } from '../../shared/utils/riotId'
+import { bannedError, banService } from '../bans/ban.service'
 import { riotService } from '../riot/riot.service'
 import { userRepository } from '../users/user.repository'
 import type { PublicUser, User } from '../users/user.types'
@@ -30,6 +31,7 @@ export const authService = {
   async register(riotId: unknown, password: unknown): Promise<AuthResult> {
     const parsed = parseRiotId(riotId)
     if (!parsed) throw new AppError('Riot ID inválido. Use o formato Nome#TAG.', 400)
+    if (banService.isRiotIdBanned(parsed)) throw bannedError()
     if (typeof password !== 'string' || password.length < 6) {
       throw new AppError('A senha precisa ter no mínimo 6 caracteres.', 400)
     }
@@ -38,6 +40,7 @@ export const authService = {
     const profile = riotService.isConfigured() ? await riotService.lookup(parsed) : null
     const account = profile ? { gameName: profile.gameName, tagLine: profile.tagLine } : parsed
 
+    if (banService.isRiotIdBanned(account)) throw bannedError()
     if (userRepository.findByRiotId(account)) throw new AppError('Esse Riot ID já está cadastrado.', 409)
 
     const user = userRepository.create(account, await bcrypt.hash(password, 10), profile?.profileIconId ?? null)
@@ -52,6 +55,8 @@ export const authService = {
 
     const user = userRepository.findByRiotId(parsed)
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) throw invalid
+    // Banido: só avisa depois da senha certa (não entrega quem está banido para quem chuta senha).
+    if (banService.isUserBanned(user.id)) throw bannedError()
 
     refreshIconInBackground(user)
     return { token: signToken(user.id), user: toPublicUser(user) }

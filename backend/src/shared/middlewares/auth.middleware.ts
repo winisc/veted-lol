@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import { AppError } from '../errors/AppError'
+import { bannedError, banService } from '../../modules/bans/ban.service'
 import { verifyToken } from '../utils/jwt'
 
 export interface AuthRequest extends Request {
@@ -15,6 +16,8 @@ export function requireAuth(req: AuthRequest, _res: Response, next: NextFunction
 
   const userId = verifyToken(token)
   if (userId === null) throw new AppError('Sessão inválida ou expirada.', 401)
+  // Banido depois de logar: a sessão aberta para de valer na hora.
+  if (banService.isUserBanned(userId)) throw bannedError()
 
   req.userId = userId
   next()

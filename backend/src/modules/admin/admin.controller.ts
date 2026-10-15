@@ -43,6 +43,20 @@ export const adminController = {
     res.json({ ok: true })
   },
 
+  bans(_req: AuthRequest, res: Response) {
+    res.json({ bans: adminService.bans() })
+  },
+
+  ban(req: AuthRequest, res: Response) {
+    adminService.ban(req.userId!, req.body?.riotId, req.body?.reason)
+    res.json({ ok: true })
+  },
+
+  unban(req: AuthRequest, res: Response) {
+    adminService.unban(req.body?.riotId)
+    res.json({ ok: true })
+  },
+
   users(_req: AuthRequest, res: Response) {
     res.json({ users: adminService.users() })
   },

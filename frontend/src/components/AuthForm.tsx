@@ -18,6 +18,7 @@ interface AuthFormProps {
   confirmPassword?: boolean;
   validateRiotId?: boolean;
   onSubmit: (riotId: string, password: string) => Promise<void>;
+  initialError?: string; // aviso já na abertura (ex.: conta banida)
 }
 
 const inputClass =
@@ -33,11 +34,12 @@ export default function AuthForm({
   confirmPassword,
   validateRiotId,
   onSubmit,
+  initialError,
 }: AuthFormProps) {
   const [riotId, setRiotId] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError ?? "");
   const [submitting, setSubmitting] = useState(false);
   const lookup = useRiotLookup(riotId, Boolean(validateRiotId));
   const blocked = lookup.status === "loading" || lookup.status === "notfound";

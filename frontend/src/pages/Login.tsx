@@ -3,7 +3,7 @@ import AuthForm from "../components/AuthForm";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, kickedMessage } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -14,6 +14,7 @@ export default function Login() {
       footerText="Ainda não tem conta?"
       footerLinkLabel="Cadastre-se"
       footerLinkTo="/cadastro"
+      initialError={kickedMessage}
       onSubmit={async (riotId, password) => {
         await login(riotId, password);
         navigate("/", { replace: true });

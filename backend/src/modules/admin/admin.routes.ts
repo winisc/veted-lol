@@ -24,4 +24,9 @@ adminRoutes.get('/users', adminController.users)
 adminRoutes.post('/users/:id/admin', adminController.setAdmin)
 adminRoutes.post('/users/:id/password', adminController.resetPassword)
 
+// Banimentos (por Riot ID, com ou sem conta)
+adminRoutes.get('/bans', adminController.bans)
+adminRoutes.post('/bans', adminController.ban)
+adminRoutes.post('/bans/remove', adminController.unban)
+
 export default adminRoutes

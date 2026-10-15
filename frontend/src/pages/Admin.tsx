@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import AdminBans from '../components/admin/AdminBans'
 import AdminLive from '../components/admin/AdminLive'
 import AdminMatches from '../components/admin/AdminMatches'
 import AdminUsers from '../components/admin/AdminUsers'
 import { useAuth } from '../context/AuthContext'
 
-type Section = 'live' | 'matches' | 'users'
+type Section = 'live' | 'matches' | 'users' | 'bans'
 
 const sections: { id: Section; label: string; description: string }[] = [
   { id: 'live', label: 'Ao vivo', description: 'Fila, confirmações de partida e lobbies abertos agora.' },
   { id: 'matches', label: 'Partidas', description: 'Histórico salvo: corrigir o resultado ou apagar uma partida.' },
   { id: 'users', label: 'Jogadores', description: 'Contas cadastradas: redefinir senha e acesso de admin.' },
+  { id: 'bans', label: 'Banimentos', description: 'Banir um Riot ID: não loga, não se cadastra e aparece como banido na tabela.' },
 ]
 
 export default function Admin() {
@@ -53,6 +55,7 @@ export default function Admin() {
         {section === 'live' && <AdminLive />}
         {section === 'matches' && <AdminMatches />}
         {section === 'users' && <AdminUsers />}
+        {section === 'bans' && <AdminBans />}
       </div>
     </div>
   )

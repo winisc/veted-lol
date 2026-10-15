@@ -18,6 +18,7 @@ export interface RankingEntry {
   mvps: number
   bagres: number
   streak?: number // sequência atual (+ vitórias, - derrotas seguidas); só na season atual
+  banned?: boolean // conta banida (continua na tabela, marcada)
 }
 
 // Ordem: mais pontos, depois melhor win rate, mais vitórias, mais MVPs, menos bagres e, por fim, nome.

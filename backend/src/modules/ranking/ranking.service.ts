@@ -4,6 +4,7 @@ import { scoringFor } from '../matches/match.scoring'
 import { LEGACY_SEASON_ID } from '../seasons/season.constants'
 import { seasonRepository, type Season } from '../seasons/season.repository'
 import { seasonService } from '../seasons/season.service'
+import { banService } from '../bans/ban.service'
 import { buildRanking, type RankingEntry } from './ranking.builder'
 
 export type { RankingEntry }
@@ -37,6 +38,8 @@ export const rankingService = {
 
     // Na season atual, cada um vem com a sequência atual (🔥 vitórias / 🧊 derrotas seguidas).
     const ranking = getRanking(season.id)
+    const banned = banService.bannedUserIds()
+    for (const entry of ranking) if (banned.has(entry.userId)) entry.banned = true
     if (season.id === current.id) {
       const streaks = matchRepository.streaks()
       for (const entry of ranking) entry.streak = streaks.get(entry.userId) ?? 0

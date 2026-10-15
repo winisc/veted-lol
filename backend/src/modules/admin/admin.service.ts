@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { AppError } from '../../shared/errors/AppError'
 import { formatRiotId } from '../../shared/utils/riotId'
+import { banService } from '../bans/ban.service'
 import { lobbyService } from '../lobby/lobby.service'
 import { matchRepository } from '../matches/match.repository'
 import { computePoints, winRate } from '../matches/match.scoring'
@@ -23,6 +24,27 @@ export const adminService = {
   removeFromQueue(userId: unknown) {
     if (typeof userId !== 'number') throw new AppError('Jogador inválido.', 400)
     queueService.adminRemove(userId)
+  },
+
+  // Banimentos por Riot ID.
+  bans() {
+    return banService.list()
+  },
+
+  ban(actorId: number, riotId: unknown, reason: unknown) {
+    const { userId } = banService.ban(actorId, riotId, reason)
+    // Se estava na fila, na confirmação ou na lista de espera, sai na hora.
+    if (userId !== null) {
+      try {
+        queueService.adminRemove(userId)
+      } catch {
+        // não estava na fila
+      }
+    }
+  },
+
+  unban(riotId: unknown) {
+    banService.unban(riotId)
   },
 
   clearQueue() {

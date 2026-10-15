@@ -68,6 +68,16 @@ db.exec(`
     bagres INTEGER NOT NULL,
     PRIMARY KEY (season_id, user_id)
   );
+
+  -- Riot IDs banidos (com ou sem conta). Quem está aqui não loga nem se cadastra.
+  CREATE TABLE IF NOT EXISTS bans (
+    game_name TEXT NOT NULL,
+    tag_line TEXT NOT NULL,
+    reason TEXT,
+    banned_at TEXT NOT NULL,
+    banned_by INTEGER,
+    UNIQUE (game_name COLLATE NOCASE, tag_line COLLATE NOCASE)
+  );
 `)
 
 // Migrações simples para bancos criados antes de uma coluna existir.
