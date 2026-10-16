@@ -269,7 +269,7 @@ function teamSummary(lobby: Lobby, side: Side) {
 
 // Resumo das partidas que acabaram de terminar (vencedor, MVP, bagre). Fica na lista ao vivo
 // por alguns segundos depois do fim. Só em memória: some ao reiniciar o servidor.
-const RECENT_RESULT_MS = 15_000
+const RECENT_RESULT_MS = 25_000 // dá tempo de revelar MVP e bagre no mesmo ritmo da animação dos jogadores
 const recentResults: {
   lobbyId: string
   matchId: string

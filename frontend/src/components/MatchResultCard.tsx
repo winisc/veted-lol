@@ -22,6 +22,11 @@ export interface RecentResult {
   teams: Record<Side, { id: number; riotId: string; iconId: number; isCaptain: boolean }[]>
 }
 
+// Quando o MVP e o bagre aparecem no resumo, contado do fim da partida: no mesmo ritmo da animação da tela final
+// dos jogadores (holofote + voo do ícone), para quem acompanha de fora não ver antes de quem jogou.
+const MVP_REVEAL_MS = 8_500
+const BAGRE_REVEAL_MS = 17_500
+
 // Some da tela quando o tempo do resumo acaba, sem esperar a próxima atualização da lista.
 export function useVisibleResults(results: RecentResult[] | undefined, skew: number) {
   const [now, setNow] = useState(() => Date.now() + skew)
@@ -41,6 +46,7 @@ export default function MatchResultCard({ result, now }: { result: RecentResult;
   const duration = result.startedAt ? (result.endedAt - result.startedAt) / 1000 : 0
   const total = result.expiresAt - result.finishedAt
   const left = Math.max(0, Math.min(100, ((result.expiresAt - now) / total) * 100))
+  const elapsed = now - result.finishedAt
 
   return (
     <li className="animate-phase-in overflow-hidden rounded-lg border border-gold-200/40 bg-gold-200/[0.04]">
@@ -69,13 +75,26 @@ export default function MatchResultCard({ result, now }: { result: RecentResult;
           <div className="mt-2 grid grid-cols-2 gap-2">
             {(
               [
-                [mvp, 'MVP', <StarIcon key="s" className="h-3.5 w-3.5" />, 'text-gold-200', 'gold'],
-                [bagre, 'Bagre', <FishIcon key="f" className="h-3.5 w-3.5" />, 'text-bagre', 'bagre'],
+                [mvp, 'MVP', <StarIcon key="s" className="h-3.5 w-3.5" />, 'text-gold-200', 'gold', MVP_REVEAL_MS],
+                [bagre, 'Bagre', <FishIcon key="f" className="h-3.5 w-3.5" />, 'text-bagre', 'bagre', BAGRE_REVEAL_MS],
               ] as const
-            ).map(([player, label, icon, color, ring]) => (
+            ).map(([player, label, icon, color, ring, revealAt]) => (
               <div key={label} className="flex min-w-0 items-center gap-2 rounded-md bg-panel px-2 py-1.5">
-                {player ? (
+                {elapsed < revealAt ? (
+                  // Ainda revelando para os jogadores: suspense até a hora.
                   <>
+                    <span className="grid h-9 w-9 shrink-0 animate-pulse place-items-center rounded-full border border-rim bg-void font-display text-lg text-ash">
+                      ?
+                    </span>
+                    <div className="min-w-0">
+                      <p className={`flex items-center gap-1 text-xs font-semibold ${color}`}>
+                        {icon} {label}
+                      </p>
+                      <p className="text-sm text-ash">Revelando...</p>
+                    </div>
+                  </>
+                ) : player ? (
+                  <div key="revealed" className="animate-phase-in flex min-w-0 items-center gap-2">
                     <SummonerIcon iconId={player.iconId} size="sm" ring={ring} />
                     <div className="min-w-0">
                       <p className={`flex items-center gap-1 text-xs font-semibold ${color}`}>
@@ -88,7 +107,7 @@ export default function MatchResultCard({ result, now }: { result: RecentResult;
                         {player.isCaptain && <CrownIcon className="h-3 w-3 shrink-0 text-gold-200" />}
                       </p>
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <p className={`flex items-center gap-1 text-xs ${color}`}>
                     {icon} Sem {label.toLowerCase()}
