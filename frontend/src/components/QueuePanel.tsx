@@ -136,7 +136,7 @@ function StandbyJoin({ waiting, max, busy, onClick }: { waiting: number; max: nu
   const full = waiting >= max
   return (
     <div className="-mt-1 flex items-center justify-between gap-2 border-t border-rim pt-2.5 text-xs text-ash">
-      <span>
+      <span className="whitespace-nowrap">
         Lista de espera <span className="font-cond text-sm font-semibold tabular-nums text-gold-50">{waiting}/{max}</span>
       </span>
       <button
@@ -144,7 +144,7 @@ function StandbyJoin({ waiting, max, busy, onClick }: { waiting: number; max: nu
         onClick={onClick}
         disabled={busy || full}
         title="Fica de reserva: vê a fila e, quando for o primeiro da espera, pode entrar nela"
-        className="rounded-md border border-rim bg-panel px-2.5 py-1 font-semibold text-gold-50 transition-colors hover:border-ash-dim disabled:opacity-50"
+        className="whitespace-nowrap rounded-md border border-rim bg-panel px-2.5 py-1 font-semibold text-gold-50 transition-colors hover:border-ash-dim disabled:opacity-50"
       >
         {full ? 'Espera cheia' : 'Entrar na espera'}
       </button>
@@ -202,7 +202,7 @@ function ModePicker({
   onStandby: (mode: QueueMode) => void
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {queueModeOrder.map((mode) => {
         const info = queueModes[mode]
         const waiting = snapshot.sizes?.[mode] ?? (snapshot.mode === mode ? snapshot.size : 0)
@@ -213,7 +213,7 @@ function ModePicker({
               <p className="mt-0.5 text-sm text-ash">{info.description}</p>
             </div>
             <div className="mt-auto flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-sm text-gold-50/80">
+              <span className="flex items-center gap-2 whitespace-nowrap text-sm text-gold-50/80">
                 <span className={`h-2 w-2 rounded-full ${waiting > 0 ? 'bg-hex-300' : 'bg-ash-dim'}`} />
                 <span className="font-cond text-base font-semibold tabular-nums">
                   {waiting}/{snapshot.requiredByMode?.[mode] ?? snapshot.required}

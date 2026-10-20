@@ -328,7 +328,7 @@ export default function Home() {
         title={`Da queue gorbila!`}
         subtitle="Personalizada 5x5. A partida começa quando 10 jogadores estiverem prontos."
       >
-        <div className="mt-4 max-w-2xl">
+        <div className="mt-4 max-w-4xl">
           <QueuePanel />
         </div>
       </PageHero>
