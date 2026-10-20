@@ -202,7 +202,7 @@ function ModePicker({
   onStandby: (mode: QueueMode) => void
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2">
       {queueModeOrder.map((mode) => {
         const info = queueModes[mode]
         const waiting = snapshot.sizes?.[mode] ?? (snapshot.mode === mode ? snapshot.size : 0)
