@@ -9,6 +9,7 @@ export type { MatchOutcome, Side }
 //   -> playing (partida em andamento) -> result (votação do vencedor) -> mvp -> bagre (o pior do time perdedor) -> finished
 //   -> rematch (contagem, se 6 votarem para jogar novamente) -> playing (lados trocados)
 export type LobbyPhase =
+  | 'teams' // ARAM: times sorteados (sem capitães nem draft), mostrados antes da partida começar
   | 'voting'
   | 'captains'
   | 'coinflip'

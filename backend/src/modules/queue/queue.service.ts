@@ -3,7 +3,7 @@ import type { Request, Response } from 'express'
 import { AppError } from '../../shared/errors/AppError'
 import { loadState, registerPersistence, schedulePersist } from '../../database/runtimeState'
 import { appEvents } from '../../shared/events/appEvents'
-import { QUEUE_MODES, isQueueMode, type QueueMode } from '../../shared/types/modes'
+import { QUEUE_MODES, isAramMode, isQueueMode, queueSize, type QueueMode } from '../../shared/types/modes'
 import { formatRiotId } from '../../shared/utils/riotId'
 import { lobbyRepository } from '../lobby/lobby.repository'
 import { lobbyService } from '../lobby/lobby.service'
@@ -13,8 +13,8 @@ import { queueEvents } from './queue.events'
 import { queueRepository } from './queue.repository'
 import type { DropReason, QueueSnapshot, ReadyCheck } from './queue.types'
 
-// QUEUE_SIZE permite testar com poucos jogadores. O padrão é 5x5 = 10.
-const REQUIRED = Number(process.env.QUEUE_SIZE) || 10
+// Jogadores para fechar cada fila (5x5 = 10; ARAM 3x3 = 6, 4x4 = 8, 5x5 = 10). Ver shared/types/modes.ts.
+const requiredByMode = () => Object.fromEntries(QUEUE_MODES.map((mode) => [mode, queueSize(mode)])) as Record<QueueMode, number>
 // Prazo para aceitar a partida quando a fila fecha.
 const READY_CHECK_MS = (Number(process.env.READY_CHECK_SECONDS) || 15) * 1000
 // Tamanho máximo da lista de espera de cada modo.
@@ -64,7 +64,8 @@ function snapshot(userId: number, notice?: string, dropped?: QueueSnapshot['drop
     mode: null,
     size: 0,
     sizes,
-    required: REQUIRED,
+    required: queueSize('vote'),
+    requiredByMode: requiredByMode(),
     readyCheck: null,
     notice,
     dropped,
@@ -86,6 +87,7 @@ function snapshot(userId: number, notice?: string, dropped?: QueueSnapshot['drop
       ...base,
       status: 'ready_check',
       mode: check.mode,
+      required: queueSize(check.mode),
       players: [],
       readyCheck: {
         endsAt: check.endsAt,
@@ -107,6 +109,7 @@ function snapshot(userId: number, notice?: string, dropped?: QueueSnapshot['drop
       ...base,
       status: 'standby',
       mode: standbyMode,
+      required: queueSize(standbyMode),
       size: sizes[standbyMode],
       players: queuePlayers(standbyMode),
       standby: {
@@ -123,6 +126,7 @@ function snapshot(userId: number, notice?: string, dropped?: QueueSnapshot['drop
     ...base,
     status: mode ? 'queued' : 'idle',
     mode,
+    required: mode ? queueSize(mode) : base.required,
     standbyPlayers: mode
       ? queueRepository.listStandby(mode).map((p) => ({ userId: p.userId, riotId: p.riotId, iconId: p.iconId }))
       : [],
@@ -142,11 +146,12 @@ function broadcast() {
 
 // Fila com jogadores suficientes: os primeiros saem da fila e recebem a confirmação de partida.
 function startReadyChecks(mode: QueueMode) {
-  while (queueRepository.size(mode) >= REQUIRED) {
+  const required = queueSize(mode)
+  while (queueRepository.size(mode) >= required) {
     const check: ReadyCheck = {
       id: randomUUID(),
       mode,
-      players: queueRepository.list(mode).slice(0, REQUIRED),
+      players: queueRepository.list(mode).slice(0, required),
       accepted: new Set(),
       endsAt: Date.now() + READY_CHECK_MS,
       durationMs: READY_CHECK_MS,
@@ -248,9 +253,9 @@ export const queueService = {
     if (current !== mode) {
       const user = userRepository.findById(userId)
       if (!user) throw new AppError('Usuário não encontrado.', 401)
-      // Para entrar na fila, o jogador precisa ter as 3 roles salvas no perfil.
+      // Para entrar na fila, o jogador precisa ter as 3 roles salvas no perfil (no ARAM não tem role).
       const { main, secondary, worst } = user.roles
-      if (!main || !secondary || !worst) {
+      if (!isAramMode(mode) && (!main || !secondary || !worst)) {
         throw new AppError('Defina suas roles no perfil antes de entrar na fila.', 409, 'ROLES_REQUIRED')
       }
 
@@ -290,9 +295,9 @@ export const queueService = {
 
     const user = userRepository.findById(userId)
     if (!user) throw new AppError('Usuário não encontrado.', 401)
-    // Mesma exigência da fila: as 3 roles salvas no perfil.
+    // Mesma exigência da fila: as 3 roles salvas no perfil (menos no ARAM).
     const { main, secondary, worst } = user.roles
-    if (!main || !secondary || !worst) {
+    if (!isAramMode(mode) && (!main || !secondary || !worst)) {
       throw new AppError('Defina suas roles no perfil antes de entrar na fila.', 409, 'ROLES_REQUIRED')
     }
     if (queueRepository.listStandby(mode).length >= STANDBY_MAX) {
@@ -352,7 +357,7 @@ export const queueService = {
     const standbyList = QUEUE_MODES.flatMap((mode) =>
       queueRepository.listStandby(mode).map((p) => ({ id: p.userId, riotId: p.riotId, iconId: p.iconId, mode })),
     )
-    return { required: REQUIRED, waiting, standby: standbyList, readyChecks: checks }
+    return { required: queueSize('vote'), requiredByMode: requiredByMode(), waiting, standby: standbyList, readyChecks: checks }
   },
 
   // Tira um jogador da fila (ou da confirmação de partida, o que devolve os outros para a fila).

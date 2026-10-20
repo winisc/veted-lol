@@ -8,6 +8,7 @@ import type { QueueMode } from '../lib/modes'
 export type Side = 'blue' | 'red'
 export type MatchOutcome = Side | 'remake'
 export type LobbyPhase =
+  | 'teams' // ARAM: times sorteados, antes da partida começar
   | 'voting'
   | 'captains'
   | 'coinflip'

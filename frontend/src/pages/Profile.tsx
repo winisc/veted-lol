@@ -30,6 +30,7 @@ import {
 import { formatDuration, splitRiotId } from "../lib/teams";
 import type { PlayerRoles } from "../lib/roles";
 import { zones, type Zone } from "../lib/zones";
+import { isAramMode, type QueueMode } from "../lib/modes";
 
 type Result = "win" | "loss" | "remake";
 
@@ -55,6 +56,7 @@ interface ProfileResponse {
   };
   history: {
     matchId: string;
+    mode?: QueueMode; // ausente em servidores antigos
     endedAt: string;
     durationSeconds: number;
     side: "blue" | "red";
@@ -66,6 +68,15 @@ interface ProfileResponse {
     seasonId?: number;
   }[];
   scoring: { win: number; loss: number; mvp: number; bagre: number };
+  // Tabela de ARAM (3x3, 4x4 e 5x5 juntos), na season atual. Ausente em servidores antigos.
+  aram?: {
+    points: number;
+    games: number;
+    wins: number;
+    losses: number;
+    rank: number | null;
+    rankedPlayers: number;
+  };
   extra?: ProfileExtraData; // ausente em servidores antigos
   season?: { id: number; startsAt: string; endsAt: string; now: number }; // season atual (ausente em servidores antigos)
   seasons?: SeasonResult[];
@@ -158,7 +169,7 @@ function pointsEvolution(
   history: ProfileResponse["history"],
   currentPoints: number,
 ): number[] {
-  const played = history.filter((m) => m.result !== "remake").reverse();
+  const played = history.filter((m) => m.result !== "remake" && !isAramMode(m.mode)).reverse();
   let points = currentPoints - played.reduce((sum, m) => sum + m.points, 0);
   return [points, ...played.map((m) => (points += m.points))];
 }
@@ -183,7 +194,7 @@ export default function Profile() {
   if (error || !data)
     return <Notice>{error || "Não foi possível carregar o perfil."}</Notice>;
 
-  const { user, stats, history, scoring, extra, season, seasons } = data;
+  const { user, stats, history, scoring, extra, season, seasons, aram } = data;
   const [name, tag] = splitRiotId(user.riotId);
   const zone = stats.zone ? zones[stats.zone] : null;
   const pointsTone = stats.points < 0 ? "text-team-red" : "text-gold-200";
@@ -287,6 +298,28 @@ export default function Profile() {
             <Stat label="Bagres" value={stats.bagres ?? 0} tone="text-bagre" />
           </div>
         </div>
+        {/* ARAM: tabela à parte, só um resumo da season atual */}
+        {aram && aram.games > 0 && (
+          <Link
+            to="/tabela?tabela=aram"
+            className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-rim bg-panel px-3 py-2 text-sm transition-colors hover:border-ash-dim"
+          >
+            <span className="font-display text-base text-gold-50">ARAM</span>
+            {aram.rank !== null && (
+              <span className="text-ash">
+                <span className="font-cond text-base font-bold text-gold-50">#{aram.rank}</span> de {aram.rankedPlayers}
+              </span>
+            )}
+            <span className={`font-cond text-base font-bold tabular-nums ${aram.points < 0 ? "text-team-red" : "text-gold-200"}`}>
+              {aram.points} pts
+            </span>
+            <span className="text-ash">
+              <span className="text-hex-300">{aram.wins}V</span> <span className="text-team-red">{aram.losses}D</span> em{" "}
+              {aram.games} {aram.games === 1 ? "partida" : "partidas"}
+            </span>
+            <span className="ml-auto text-xs text-gold-200">Ver tabela ARAM</span>
+          </Link>
+        )}
         <ScoringRules
           scoring={scoring}
           className="mt-5 border-t border-rim pt-4"
@@ -349,6 +382,9 @@ export default function Profile() {
                               ? "Lado azul"
                               : "Lado vermelho"}
                           </span>
+                          {isAramMode(match.mode) && (
+                            <span className="rounded bg-gold-200/15 px-1.5 py-0.5 text-xs font-semibold text-gold-200">ARAM</span>
+                          )}
                           {match.isCaptain && (
                             <span className="flex items-center gap-1 text-gold-200">
                               <CrownIcon className="h-3.5 w-3.5" /> Capitão

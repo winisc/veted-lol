@@ -17,9 +17,10 @@ interface Props {
   bagreId?: number | null
   winner?: boolean
   title?: string
+  hideRoles?: boolean // ARAM: não tem role
 }
 
-export default function TeamCard({ side, members, slots, mvpId, bagreId, winner, title }: Props) {
+export default function TeamCard({ side, members, slots, mvpId, bagreId, winner, title, hideRoles }: Props) {
   const style = sideStyle[side]
   const profilePath = useProfilePath()
   const rows = Array.from({ length: Math.max(slots ?? 0, members.length) }, (_, i) => members[i])
@@ -48,7 +49,7 @@ export default function TeamCard({ side, members, slots, mvpId, bagreId, winner,
                 fullName
                 hideTag
                 iconBadge={<RankBadge position={member.rankPosition} overlay />}
-                right={<RoleIcons roles={member.roles} />}
+                right={hideRoles ? undefined : <RoleIcons roles={member.roles} />}
                 badges={
                   <>
                     <EloBadge elo={member.elo} compact />

@@ -31,6 +31,7 @@ export interface QueueSnapshot {
   mode: QueueMode | null // fila (ou confirmação) em que o jogador está
   size: number // jogadores esperando na fila do modo do jogador (0 se não está em fila)
   sizes: Record<QueueMode, number> // quantos esperam em cada fila (para os botões de entrar)
+  requiredByMode: Record<QueueMode, number> // jogadores para fechar cada fila
   required: number
   players: { userId: number; riotId: string; iconId: number; isYou: boolean }[]
   // Lista de espera (até `standbyMax` por modo): quem está nela vê a fila e o primeiro pode entrar na fila de verdade.

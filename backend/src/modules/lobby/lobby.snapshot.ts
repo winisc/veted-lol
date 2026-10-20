@@ -1,3 +1,4 @@
+import { isAramMode } from '../../shared/types/modes'
 import { eloService } from '../riot/elo.service'
 import { lobbyConfig } from './lobby.config'
 import type { Lobby, LobbySnapshot, MatchOutcome, Side } from './lobby.types'
@@ -24,6 +25,7 @@ export const countMvpVotes = (lobby: Lobby) => countTargets(lobby.mvpVotes)
 export const countBagreVotes = (lobby: Lobby) => countTargets(lobby.bagreVotes)
 
 export function votesNeeded(lobby: Lobby) {
+  if (isAramMode(lobby.mode)) return Math.ceil(lobby.players.length * lobbyConfig.aramVotesShare)
   return Math.min(lobbyConfig.matchVotesNeeded, lobby.players.length)
 }
 

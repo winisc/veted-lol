@@ -19,7 +19,7 @@ import {
   votesNeeded,
 } from './lobby.snapshot'
 import type { Lobby, LobbyEvent, LobbyPhase, LobbyPlayer, LobbySnapshot, MatchOutcome, Side } from './lobby.types'
-import type { QueueMode } from '../../shared/types/modes'
+import { boardOf, isAramMode, type QueueMode } from '../../shared/types/modes'
 import { matchRepository } from '../matches/match.repository'
 import { eloService } from '../riot/elo.service'
 import { getRanking } from '../ranking/ranking.service'
@@ -29,7 +29,7 @@ import { userRepository } from '../users/user.repository'
 const timers = new Map<string, NodeJS.Timeout>()
 
 // Reações rápidas do lobby: só estas (o texto/emoji de cada uma fica no frontend). Uma por jogador a cada 1,5s.
-const REACTIONS = new Set(['gg', 'bora', 'fire', 'laugh', 'rage', 'bagre', 'carry', 'f'])
+const REACTIONS = new Set(['gg', 'bora', 'fire', 'laugh', 'rage', 'bagre', 'carry', 'f', 'gelin', 'rato'])
 const REACTION_COOLDOWN_MS = 1500
 const lastReactionAt = new Map<number, number>()
 
@@ -90,6 +90,7 @@ function timeoutAction(lobby: Lobby): (() => void) | null {
     case 'picking':
       return () => autoPick(lobby)
     case 'done':
+    case 'teams':
       return () => startPlaying(lobby)
     case 'mvp':
       return () => finishMvp(lobby)
@@ -206,6 +207,35 @@ function applyPick(lobby: Lobby, playerId: number, auto = false) {
 // Capitão ausente: o tempo acabou, escolhe um jogador aleatório para o draft não travar.
 function autoPick(lobby: Lobby) {
   applyPick(lobby, randomItem(draftPool(lobby)).userId)
+}
+
+// ---- ARAM: times sorteados, equilibrados pela tabela de ARAM ----
+
+// Quantas divisões aleatórias são testadas, e a folga (em pontos de diferença entre os times) para uma divisão
+// ainda contar como "das mais equilibradas". Entre essas, uma é sorteada: os times mudam a cada partida,
+// mas ninguém fica com todos os mais fortes. Sem pontos (começo de season), é sorteio puro.
+const ARAM_TRIES = 400
+const ARAM_SLACK_POINTS = 25 // uma vitória
+
+function aramTeams(lobby: Lobby): Record<Side, number[]> {
+  const ids = lobby.players.map((p) => p.userId)
+  const half = ids.length / 2
+  const points = (id: number) => lobby.rankPoints?.get(id) ?? 0
+  const options = Array.from({ length: ARAM_TRIES }, () => {
+    const order = shuffle(ids)
+    const blue = order.slice(0, half)
+    const red = order.slice(half)
+    const diff = Math.abs(blue.reduce((s, id) => s + points(id), 0) - red.reduce((s, id) => s + points(id), 0))
+    return { blue, red, diff }
+  })
+  const best = Math.min(...options.map((o) => o.diff))
+  const { blue, red } = randomItem(options.filter((o) => o.diff <= best + ARAM_SLACK_POINTS))
+  return { blue, red }
+}
+
+function startAramTeams(lobby: Lobby) {
+  lobby.teams = aramTeams(lobby)
+  setPhase(lobby, 'teams', lobbyConfig.teamsMs, () => startPlaying(lobby))
 }
 
 // ---- Partida: em andamento -> votação do vencedor -> MVP -> bagre -> salva no histórico ----
@@ -378,15 +408,16 @@ export const lobbyService = {
   },
 
   create(players: LobbyPlayer[], mode: QueueMode = 'vote'): Lobby {
-    // Posição de cada um na tabela agora (mostrada na tela e usada no modo tabela).
-    const ranking = getRanking()
+    // Posição de cada um na tabela agora (mostrada na tela e usada no modo tabela). No ARAM, a tabela de ARAM.
+    const board = boardOf(mode)
+    const ranking = getRanking(undefined, board)
     const rankPositions = new Map(
       players.map((p) => [p.userId, ranking.find((e) => e.userId === p.userId)?.position ?? null] as const),
     )
     const rankPoints = new Map(
       players.map((p) => [p.userId, ranking.find((e) => e.userId === p.userId)?.points ?? null] as const),
     )
-    const allStreaks = matchRepository.streaks()
+    const allStreaks = matchRepository.streaks(board)
     const streaks = new Map(players.map((p) => [p.userId, allStreaks.get(p.userId) ?? 0] as const))
     // Início de season: quase ninguém tem posição ainda. Para o modo tabela não virar sorteio puro, quem não jogou na
     // season atual entra pela posição da anterior, atrás de todos os que já têm posição agora.
@@ -445,7 +476,10 @@ export const lobbyService = {
       if (changed && lobbyRepository.findById(lobby.id)) broadcast(lobby)
     })
 
-    if (mode === 'ranked') {
+    if (isAramMode(mode)) {
+      // ARAM: sem votação, capitães nem draft. Os times já saem sorteados.
+      startAramTeams(lobby)
+    } else if (mode === 'ranked') {
       // Sem votação: capitães pela tabela e já mostra o resultado antes do sorteio.
       lobby.captains = pickCaptainsByRanking(lobby)
       setPhase(lobby, 'captains', lobbyConfig.revealMs, () => startOrder(lobby))
@@ -480,8 +514,10 @@ export const lobbyService = {
   react(userId: number, reaction: unknown): LobbySnapshot {
     const lobby = requireLobby(userId)
     if (typeof reaction !== 'string' || !REACTIONS.has(reaction)) throw new AppError('Reação inválida.', 400)
-    // Reações só durante o draft.
-    if (lobby.phase !== 'picking' && lobby.phase !== 'done') throw new AppError('Reações só durante o draft.', 409)
+    // Reações só durante o draft (no ARAM, na tela dos times sorteados).
+    if (lobby.phase !== 'picking' && lobby.phase !== 'done' && lobby.phase !== 'teams') {
+      throw new AppError('Reações só durante o draft.', 409)
+    }
     const now = Date.now()
     if (now - (lastReactionAt.get(userId) ?? 0) < REACTION_COOLDOWN_MS) throw new AppError('Calma! Uma reação por vez.', 429)
     lastReactionAt.set(userId, now)

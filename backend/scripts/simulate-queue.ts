@@ -3,6 +3,7 @@
 //   npm run sim:queue                  -> 9 bots na fila (você entra como o 10º)
 //   npm run sim:queue -- --count=4     -> outra quantidade de bots
 //   npm run sim:queue -- --mode=ranked -> bots na fila do modo tabela (padrão: modo capitão)
+//   npm run sim:queue -- --mode=aram3  -> bots na fila ARAM 3x3 (também aram4 e aram5); sem --count, enche a fila menos 1
 //   npm run sim:queue -- --match-seconds=60  -> duração da partida antes de os bots a encerrarem (padrão 20)
 //   npm run sim:queue -- --clean       -> apaga as contas dos bots e as partidas de teste do histórico
 //
@@ -27,11 +28,15 @@ const VOTE_DELAY_RANGE_MS: [number, number] = [1500, 8000]
 const ACTION_DELAY_RANGE_MS: [number, number] = [1500, 4000] // escolher lado e fazer picks
 
 const args = process.argv.slice(2)
-const count = Number(args.find((a) => a.startsWith('--count='))?.split('=')[1]) || 9
 // Quanto tempo a partida dura antes de os bots votarem para encerrá-la.
 const MATCH_SECONDS = Number(args.find((a) => a.startsWith('--match-seconds='))?.split('=')[1]) || 20
-// Fila em que os bots entram: vote (capitães por votação, padrão) ou ranked (capitães pela tabela).
-const MODE = args.find((a) => a.startsWith('--mode='))?.split('=')[1] === 'ranked' ? 'ranked' : 'vote'
+// Fila em que os bots entram: vote (capitães por votação, padrão), ranked (capitães pela tabela) ou ARAM (aram3/4/5).
+const MODES = ['vote', 'ranked', 'aram3', 'aram4', 'aram5'] as const
+const modeArg = args.find((a) => a.startsWith('--mode='))?.split('=')[1]
+const MODE = (MODES as readonly string[]).includes(modeArg ?? '') ? (modeArg as (typeof MODES)[number]) : 'vote'
+const QUEUE_SIZES = { vote: 10, ranked: 10, aram3: 6, aram4: 8, aram5: 10 }
+// Bots: a fila menos 1 (você entra como o último).
+const count = Number(args.find((a) => a.startsWith('--count='))?.split('=')[1]) || QUEUE_SIZES[MODE] - 1
 
 interface LobbyPlayer {
   id: number
@@ -40,7 +45,7 @@ interface LobbyPlayer {
 }
 interface LobbySnapshot {
   id: string
-  phase: 'voting' | 'captains' | 'coinflip' | 'order' | 'side' | 'picking' | 'done' | 'playing' | 'result' | 'mvp' | 'bagre' | 'finished' | 'rematch'
+  phase: 'teams' | 'voting' | 'captains' | 'coinflip' | 'order' | 'side' | 'picking' | 'done' | 'playing' | 'result' | 'mvp' | 'bagre' | 'finished' | 'rematch'
   players: LobbyPlayer[]
   draft: { currentTurnId: number | null; pickIndex: number }
   match: { mvpCandidates: number[]; bagreCandidates: number[]; gameNumber: number; rematchVotes: number; rematchAvailable: boolean }

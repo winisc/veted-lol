@@ -5,6 +5,7 @@ import Notice from '../ui/Notice'
 
 // Nome legível de cada fase do lobby.
 export const phaseLabel: Record<LobbyPhase, string> = {
+  teams: 'Times sorteados (ARAM)',
   voting: 'Votação de capitães',
   captains: 'Capitães definidos',
   coinflip: 'Sorteio',

@@ -69,6 +69,20 @@ db.exec(`
     PRIMARY KEY (season_id, user_id)
   );
 
+  -- Tabela de ARAM congelada de cada season encerrada (mesmo formato da normal, em season_standings).
+  CREATE TABLE IF NOT EXISTS aram_season_standings (
+    season_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    points INTEGER NOT NULL,
+    games INTEGER NOT NULL,
+    wins INTEGER NOT NULL,
+    losses INTEGER NOT NULL,
+    mvps INTEGER NOT NULL,
+    bagres INTEGER NOT NULL,
+    PRIMARY KEY (season_id, user_id)
+  );
+
   -- Riot IDs banidos (com ou sem conta). Quem está aqui não loga nem se cadastra.
   CREATE TABLE IF NOT EXISTS bans (
     game_name TEXT NOT NULL,

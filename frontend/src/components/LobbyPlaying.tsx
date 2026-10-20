@@ -3,6 +3,7 @@ import type { LobbySnapshot } from '../hooks/useLobby'
 import { formatDuration, teamMembers } from '../lib/teams'
 import TeamCard from './TeamCard'
 import WinChanceBar from './WinChanceBar'
+import { isAramMode } from '../lib/modes'
 import HexButton from './ui/HexButton'
 
 interface Props {
@@ -33,9 +34,9 @@ export default function LobbyPlaying({ lobby, skew, busy, onVoteEnd }: Props) {
       <WinChanceBar lobby={lobby} />
 
       <div className="grid items-start gap-3 md:grid-cols-[1fr_auto_1fr]">
-        <TeamCard side="blue" members={teamMembers(lobby, 'blue')} />
+        <TeamCard side="blue" members={teamMembers(lobby, 'blue')} hideRoles={isAramMode(lobby.mode)} />
         <span className="hidden self-center font-display text-3xl text-gold-500 md:block">vs</span>
-        <TeamCard side="red" members={teamMembers(lobby, 'red')} />
+        <TeamCard side="red" members={teamMembers(lobby, 'red')} hideRoles={isAramMode(lobby.mode)} />
       </div>
 
       {/* Botão e progresso lado a lado */}

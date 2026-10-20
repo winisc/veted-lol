@@ -88,6 +88,10 @@ export const profileService = {
         rankedPlayers: s.id === season.id ? ranking.length : seasonRepository.standings(s.id).length,
       }
     })
+    // ARAM: tabela à parte (3x3, 4x4 e 5x5 juntos), só o resumo da season atual.
+    const aramStats = matchRepository.statsForUser(userId, season.id, 'aram')
+    const aramRanking = getRanking(season.id, 'aram')
+    const aramEntry = aramRanking.find((e) => e.userId === userId)
     // As estatísticas extras (capitão, sequências, duos, freguês e carrasco) também recomeçam a cada season.
     const captain = matchRepository.captainStats(userId, season.id)
 
@@ -110,6 +114,17 @@ export const profileService = {
         rank: entry?.position ?? null, // null enquanto não jogou nenhuma partida válida
         zone: entry?.zone ?? null,
         rankedPlayers: ranking.length,
+      },
+      aram: {
+        points: computePoints(aramStats, season.id),
+        games: aramStats.games,
+        wins: aramStats.wins,
+        losses: aramStats.losses,
+        winRate: winRate(aramStats.wins, aramStats.losses),
+        mvps: aramStats.mvps,
+        bagres: aramStats.bagres,
+        rank: aramEntry?.position ?? null,
+        rankedPlayers: aramRanking.length,
       },
       season: { id: season.id, startsAt: season.startsAt, endsAt: season.endsAt, now: Date.now() },
       seasons,

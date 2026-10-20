@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import LobbyAramTeams from '../components/LobbyAramTeams'
 import LobbyAwardVote from '../components/LobbyAwardVote'
 import LobbyCaptains from '../components/LobbyCaptains'
 import LobbyCoinFlip from '../components/LobbyCoinFlip'
@@ -20,7 +21,7 @@ import { useQueue } from '../context/QueueContext'
 import { useLobby, type LobbyPhase } from '../hooks/useLobby'
 import { useLobbySounds } from '../hooks/useLobbySounds'
 import { pageSplash } from '../lib/ddragon'
-import { queueModes } from '../lib/modes'
+import { isAramMode, queueModes } from '../lib/modes'
 
 // Etapas mostradas no topo, na ordem do lobby. Cada fase do servidor cai em uma delas.
 const stages: { label: string; phases: LobbyPhase[] }[] = [
@@ -32,11 +33,18 @@ const stages: { label: string; phases: LobbyPhase[] }[] = [
   { label: 'Fim', phases: ['finished', 'rematch'] },
 ]
 
-function StageBar({ phase }: { phase: LobbyPhase }) {
-  const current = stages.findIndex((s) => s.phases.includes(phase))
+// ARAM: sem capitães nem draft, os times já vêm sorteados.
+const aramStages: { label: string; phases: LobbyPhase[] }[] = [
+  { label: 'Times', phases: ['teams'] },
+  ...stages.slice(3),
+]
+
+function StageBar({ phase, aram }: { phase: LobbyPhase; aram: boolean }) {
+  const list = aram ? aramStages : stages
+  const current = list.findIndex((s) => s.phases.includes(phase))
   return (
-    <ol className="grid grid-cols-6 gap-1" aria-label="Etapas do lobby">
-      {stages.map((stage, i) => {
+    <ol className={`grid gap-1 ${aram ? 'grid-cols-4' : 'grid-cols-6'}`} aria-label="Etapas do lobby">
+      {list.map((stage, i) => {
         const state = i < current ? 'done' : i === current ? 'current' : 'next'
         return (
           <li key={stage.label} aria-current={state === 'current' ? 'step' : undefined} className="min-w-0">
@@ -137,7 +145,7 @@ export default function Lobby() {
           </span>
         </h1>
         <div className="order-last w-full md:order-0 md:w-auto md:flex-1">
-          <StageBar phase={lobby.phase} />
+          <StageBar phase={lobby.phase} aram={isAramMode(lobby.mode)} />
         </div>
         {!inMatch && (
           <HexButton
@@ -159,7 +167,8 @@ export default function Lobby() {
         <section className="rounded-xl border border-rim bg-abyss p-4 sm:px-5">
           {/* A key muda a cada fase, então o conteúdo novo entra com animação (só na troca de fase, não a cada voto/pick). */}
           <div key={lobby.phase === 'done' ? 'picking' : lobby.phase} className="animate-phase-in">
-            {lobby.phase === 'voting' && <LobbyVoting lobby={lobby} skew={skew} busy={busy} onVote={vote} />}
+            {lobby.phase === 'teams' && <LobbyAramTeams lobby={lobby} skew={skew} />}
+          {lobby.phase === 'voting' && <LobbyVoting lobby={lobby} skew={skew} busy={busy} onVote={vote} />}
             {lobby.phase === 'captains' && <LobbyCaptains lobby={lobby} skew={skew} />}
             {lobby.phase === 'coinflip' && <LobbyCoinFlip lobby={lobby} skew={skew} />}
             {lobby.phase === 'order' && <LobbyOrder lobby={lobby} skew={skew} busy={busy} onChoose={chooseOrder} />}
@@ -179,7 +188,7 @@ export default function Lobby() {
         </section>
 
         {/* Reações rápidas (só no draft): aparecem por cima do ícone de quem mandou e no canto da tela */}
-        {(lobby.phase === 'picking' || lobby.phase === 'done') && (
+        {(lobby.phase === 'picking' || lobby.phase === 'done' || lobby.phase === 'teams') && (
           <div className="flex justify-center">
             <ReactionBar onReact={react} />
           </div>

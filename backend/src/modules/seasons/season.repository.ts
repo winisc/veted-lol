@@ -3,6 +3,10 @@ import { resolveIconId } from '../../shared/utils/icons'
 import { formatRiotId } from '../../shared/utils/riotId'
 import { winRate } from '../matches/match.scoring'
 import { zoneFor } from '../ranking/ranking.zones'
+import type { Board } from '../../shared/types/modes'
+
+// Tabela congelada de cada tabela de pontos.
+const standingsTable = (board: Board) => (board === 'aram' ? 'aram_season_standings' : 'season_standings')
 import type { RankingEntry } from '../ranking/ranking.builder'
 
 export interface Season {
@@ -62,21 +66,21 @@ export const seasonRepository = {
     return rows.map(toSeason)
   },
 
-  saveStandings(seasonId: number, entries: RankingEntry[]) {
+  saveStandings(seasonId: number, entries: RankingEntry[], board: Board = 'normal') {
     const insert = db.prepare(
-      `INSERT OR REPLACE INTO season_standings (season_id, user_id, position, points, games, wins, losses, mvps, bagres)
+      `INSERT OR REPLACE INTO ${standingsTable(board)} (season_id, user_id, position, points, games, wins, losses, mvps, bagres)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     for (const e of entries) insert.run(seasonId, e.userId, e.position, e.points, e.games, e.wins, e.losses, e.mvps, e.bagres)
   },
 
   // Tabela congelada de uma season encerrada, já no formato da tabela normal.
-  standings(seasonId: number): RankingEntry[] {
+  standings(seasonId: number, board: Board = 'normal'): RankingEntry[] {
     const rows = db
       .prepare(
         `SELECT st.user_id AS userId, st.position, st.points, st.games, st.wins, st.losses, st.mvps, st.bagres,
                 u.game_name AS gameName, u.tag_line AS tagLine, u.profile_icon_id AS profileIconId
-         FROM season_standings st LEFT JOIN users u ON u.id = st.user_id
+         FROM ${standingsTable(board)} st LEFT JOIN users u ON u.id = st.user_id
          WHERE st.season_id = ? ORDER BY st.position`,
       )
       .all(seasonId) as {

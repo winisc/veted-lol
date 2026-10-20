@@ -1,4 +1,6 @@
 import { Fragment, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import type { Board } from "../lib/modes";
 import { YouBadge } from "../components/ui/Badges";
 import Notice from "../components/ui/Notice";
 import PageHero from "../components/ui/PageHero";
@@ -227,9 +229,16 @@ function AwardLeaders({ ranking, myId }: { ranking: RankingEntry[]; myId?: numbe
 
 export default function Ranking() {
   const { user } = useAuth();
+  // Qual tabela: a normal (filas 5x5) ou a de ARAM. Fica na URL (?tabela=aram) para dar para mandar o link.
+  const [params, setParams] = useSearchParams();
+  const board: Board = params.get("tabela") === "aram" ? "aram" : "normal";
   // null = a season atual. Ao trocar, a tabela anterior continua na tela até a nova chegar.
   const [seasonId, setSeasonId] = useState<number | null>(null);
-  const { data, error, loading } = useApi<RankingResponse>(seasonId === null ? "/ranking" : `/ranking?season=${seasonId}`);
+  const query = new URLSearchParams();
+  if (seasonId !== null) query.set("season", String(seasonId));
+  if (board === "aram") query.set("board", "aram");
+  const { data, error, loading } = useApi<RankingResponse>(`/ranking${query.size ? `?${query}` : ""}`);
+  const setBoard = (next: Board) => setParams(next === "aram" ? { tabela: "aram" } : {}, { replace: true });
 
   if (loading && !data) return <p className="text-ash">Carregando tabela...</p>;
   if (error || !data)
@@ -246,7 +255,7 @@ export default function Ranking() {
         splash={pageSplash.ranking}
         focus="object-[center_15%]"
         compact
-        title="Tabela"
+        title={board === "aram" ? "Tabela ARAM" : "Tabela"}
         subtitle={
           <>
             {mine ? (
@@ -282,6 +291,24 @@ export default function Ranking() {
         )}
         <ScoringRules scoring={scoring} className="mt-2" />
       </PageHero>
+
+      {/* Tabela normal (filas 5x5 com draft) ou de ARAM (3x3, 4x4 e 5x5 juntos) */}
+      <div className="flex gap-1 border-b border-rim" role="tablist" aria-label="Tabelas">
+        {(["normal", "aram"] as const).map((b) => (
+          <button
+            key={b}
+            type="button"
+            role="tab"
+            aria-selected={board === b}
+            onClick={() => setBoard(b)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+              board === b ? "border-gold-200 text-gold-50" : "border-transparent text-ash hover:text-gold-50"
+            }`}
+          >
+            {b === "aram" ? "ARAM" : "5x5"}
+          </button>
+        ))}
+      </div>
 
       {/* Seasons: a atual e as encerradas (tabela final guardada) */}
       {seasons && seasons.length > 1 && (

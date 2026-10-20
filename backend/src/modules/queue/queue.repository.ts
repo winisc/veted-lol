@@ -3,9 +3,14 @@ import type { QueuePlayer, ReadyCheck } from './queue.types'
 
 // Estado em memória: as filas são temporárias e somem se o servidor reiniciar.
 // Uma fila por modo; a Map mantém a ordem de inserção, então cada fila é FIFO.
-const waiting: Record<QueueMode, Map<number, QueuePlayer>> = { vote: new Map(), ranked: new Map() }
+const perMode = <T>(make: () => T) => Object.fromEntries(QUEUE_MODES.map((mode) => [mode, make()])) as Record<QueueMode, T>
+const waiting: Record<QueueMode, Map<number, QueuePlayer>> = perMode(() => new Map())
 // Lista de espera de cada modo: fora da fila de verdade, em ordem de chegada.
-const standby: Record<QueueMode, Map<number, QueuePlayer>> = { vote: new Map(), ranked: new Map() }
+const standby: Record<QueueMode, Map<number, QueuePlayer>> = perMode(() => new Map())
+const values = (record: Record<QueueMode, Map<number, QueuePlayer>>) =>
+  Object.fromEntries(QUEUE_MODES.map((mode) => [mode, [...record[mode].values()]])) as Record<QueueMode, QueuePlayer[]>
+const sizesOf = (record: Record<QueueMode, Map<number, QueuePlayer>>) =>
+  Object.fromEntries(QUEUE_MODES.map((mode) => [mode, record[mode].size])) as Record<QueueMode, number>
 const readyChecks = new Map<string, ReadyCheck>()
 const readyCheckByUser = new Map<number, string>()
 
@@ -13,8 +18,8 @@ export const queueRepository = {
   // Estado inteiro para guardar no banco (ver database/runtimeState.ts).
   dump() {
     return {
-      waiting: { vote: [...waiting.vote.values()], ranked: [...waiting.ranked.values()] },
-      standby: { vote: [...standby.vote.values()], ranked: [...standby.ranked.values()] },
+      waiting: values(waiting),
+      standby: values(standby),
       readyChecks: [...readyChecks.values()],
     }
   },
@@ -61,7 +66,7 @@ export const queueRepository = {
   },
 
   sizes(): Record<QueueMode, number> {
-    return { vote: waiting.vote.size, ranked: waiting.ranked.size }
+    return sizesOf(waiting)
   },
 
   // ---- lista de espera ----
@@ -85,7 +90,7 @@ export const queueRepository = {
   },
 
   standbySizes(): Record<QueueMode, number> {
-    return { vote: standby.vote.size, ranked: standby.ranked.size }
+    return sizesOf(standby)
   },
 
   // ---- confirmações de partida ----

@@ -1,6 +1,7 @@
 import db from '../../database/db'
 import { resolveIconId } from '../../shared/utils/icons'
 import { formatRiotId } from '../../shared/utils/riotId'
+import { boardSql, type Board } from '../../shared/types/modes'
 import { LEGACY_SEASON_ID } from '../seasons/season.constants'
 import type { AdminMatch, AdminMatchPlayerRow, MatchDetail, MatchVote, PlayerResult, Rival, HistoryRow, MatchOutcome, NewMatch, PlayerStats, RankingRow } from './match.types'
 
@@ -53,7 +54,8 @@ export const matchRepository = {
   },
 
   // Remakes não contam como jogo nem como vitória/derrota. Com `seasonId`, só as partidas dessa season.
-  statsForUser(userId: number, seasonId?: number): PlayerStats {
+  // `board`: de qual tabela (a normal ou a de ARAM) — cada partida conta em uma só.
+  statsForUser(userId: number, seasonId?: number, board: Board = 'normal'): PlayerStats {
     const row = db
       .prepare(
         `SELECT
@@ -63,7 +65,8 @@ export const matchRepository = {
            COALESCE(SUM(mp.is_mvp), 0) AS mvps,
            COALESCE(SUM(mp.is_bagre), 0) AS bagres
          FROM match_players mp JOIN matches m ON m.id = mp.match_id
-         WHERE mp.user_id = ? AND mp.result != 'remake' AND (? IS NULL OR COALESCE(m.season_id, ${LEGACY_SEASON_ID}) = ?)`,
+         WHERE mp.user_id = ? AND mp.result != 'remake' AND ${boardSql(board)}
+           AND (? IS NULL OR COALESCE(m.season_id, ${LEGACY_SEASON_ID}) = ?)`,
       )
       .get(userId, seasonId ?? null, seasonId ?? null) as PlayerStats
     return row
@@ -71,13 +74,13 @@ export const matchRepository = {
 
   // Sequência atual de cada jogador (todas as seasons, remakes não contam nem quebram): positivo = vitórias seguidas,
   // negativo = derrotas seguidas. Quem não tem partidas fica fora do mapa.
-  streaks(): Map<number, number> {
+  streaks(board: Board = 'normal'): Map<number, number> {
     const rows = db
       .prepare(
         `SELECT mp.user_id AS userId, mp.result AS result
          FROM match_players mp
          JOIN matches m ON m.id = mp.match_id
-         WHERE mp.result != 'remake'
+         WHERE mp.result != 'remake' AND ${boardSql(board)}
          ORDER BY m.ended_at DESC`,
       )
       .all() as { userId: number; result: 'win' | 'loss' }[]
@@ -94,7 +97,7 @@ export const matchRepository = {
   },
 
   // Todos os jogadores com pelo menos uma partida válida (sem remakes). Com `seasonId`, só as dessa season.
-  rankingRows(seasonId?: number): RankingRow[] {
+  rankingRows(seasonId?: number, board: Board = 'normal'): RankingRow[] {
     const rows = db
       .prepare(
         `SELECT
@@ -107,7 +110,8 @@ export const matchRepository = {
          FROM match_players mp
          JOIN matches m ON m.id = mp.match_id
          JOIN users u ON u.id = mp.user_id
-         WHERE mp.result != 'remake' AND (? IS NULL OR COALESCE(m.season_id, ${LEGACY_SEASON_ID}) = ?)
+         WHERE mp.result != 'remake' AND ${boardSql(board)}
+           AND (? IS NULL OR COALESCE(m.season_id, ${LEGACY_SEASON_ID}) = ?)
          GROUP BY u.id`,
       )
       .all(seasonId ?? null, seasonId ?? null) as RankingRow[]
@@ -119,7 +123,7 @@ export const matchRepository = {
     const rows = db
       .prepare(
         `SELECT
-           m.id AS matchId, m.ended_at AS endedAt, m.duration_seconds AS durationSeconds,
+           m.id AS matchId, m.mode AS mode, m.ended_at AS endedAt, m.duration_seconds AS durationSeconds,
            mp.side AS side, mp.result AS result, mp.is_captain AS isCaptain, mp.is_mvp AS isMvp,
            mp.is_bagre AS isBagre, COALESCE(m.season_id, ${LEGACY_SEASON_ID}) AS seasonId
          FROM match_players mp
@@ -182,12 +186,12 @@ export const matchRepository = {
   },
 
   // Resultados do jogador, do mais recente para o mais antigo (sem remakes), para as sequências. Com `seasonId`, só dessa season.
-  resultsForUser(userId: number, seasonId?: number): ('win' | 'loss')[] {
+  resultsForUser(userId: number, seasonId?: number, board: Board = 'normal'): ('win' | 'loss')[] {
     const rows = db
       .prepare(
         `SELECT mp.result AS result
          FROM match_players mp JOIN matches m ON m.id = mp.match_id
-         WHERE mp.user_id = ? AND mp.result != 'remake' AND %s
+         WHERE mp.user_id = ? AND mp.result != 'remake' AND ${boardSql(board)} AND %s
          ORDER BY m.ended_at DESC`.replace('%s', SEASON_FILTER_SQL),
       )
       .all(userId, seasonId ?? null, seasonId ?? null) as { result: PlayerResult }[]
@@ -195,7 +199,7 @@ export const matchRepository = {
   },
 
   // Números do jogador separados por season (remakes não contam), para somar a carreira respeitando a pontuação de cada época.
-  statsBySeason(userId: number): (PlayerStats & { seasonId: number })[] {
+  statsBySeason(userId: number, board: Board = 'normal'): (PlayerStats & { seasonId: number })[] {
     return db
       .prepare(
         `SELECT COALESCE(m.season_id, ${LEGACY_SEASON_ID}) AS seasonId,
@@ -205,7 +209,7 @@ export const matchRepository = {
                 COALESCE(SUM(mp.is_mvp), 0) AS mvps,
                 COALESCE(SUM(mp.is_bagre), 0) AS bagres
          FROM match_players mp JOIN matches m ON m.id = mp.match_id
-         WHERE mp.user_id = ? AND mp.result != 'remake'
+         WHERE mp.user_id = ? AND mp.result != 'remake' AND ${boardSql(board)}
          GROUP BY seasonId`,
       )
       .all(userId) as (PlayerStats & { seasonId: number })[]
@@ -216,22 +220,25 @@ export const matchRepository = {
       .prepare(
         `SELECT COUNT(*) AS games, COALESCE(SUM(mp.result = 'win'), 0) AS wins
          FROM match_players mp JOIN matches m ON m.id = mp.match_id
-         WHERE mp.user_id = ? AND mp.is_captain = 1 AND mp.result != 'remake' AND %s`.replace('%s', SEASON_FILTER_SQL),
+         WHERE mp.user_id = ? AND mp.is_captain = 1 AND mp.result != 'remake' AND ${boardSql('normal')} AND %s`.replace(
+          '%s',
+          SEASON_FILTER_SQL,
+        ),
       )
       .get(userId, seasonId ?? null, seasonId ?? null) as { games: number; wins: number }
   },
 
   // Contra quem o jogador já jogou (times opostos): vitórias e derrotas dele contra cada adversário.
-  headToHead(userId: number, seasonId?: number): Rival[] {
-    return this.versus(userId, 'opposite', seasonId)
+  headToHead(userId: number, seasonId?: number, board: Board = 'normal'): Rival[] {
+    return this.versus(userId, 'opposite', seasonId, board)
   },
 
   // Com quem o jogador já jogou junto (mesmo time): vitórias e derrotas dele com cada parceiro.
-  withTeammates(userId: number, seasonId?: number): Rival[] {
-    return this.versus(userId, 'same', seasonId)
+  withTeammates(userId: number, seasonId?: number, board: Board = 'normal'): Rival[] {
+    return this.versus(userId, 'same', seasonId, board)
   },
 
-  versus(userId: number, relation: 'same' | 'opposite', seasonId?: number): Rival[] {
+  versus(userId: number, relation: 'same' | 'opposite', seasonId?: number, board: Board = 'normal'): Rival[] {
     const sideTest = relation === 'same' ? 'o.side = me.side AND o.user_id != me.user_id' : 'o.side != me.side'
     const rows = db
       .prepare(
@@ -241,7 +248,7 @@ export const matchRepository = {
          JOIN matches m ON m.id = me.match_id
          JOIN match_players o ON o.match_id = me.match_id AND ${sideTest}
          JOIN users u ON u.id = o.user_id
-         WHERE me.user_id = ? AND me.result != 'remake' AND ${SEASON_FILTER_SQL}
+         WHERE me.user_id = ? AND me.result != 'remake' AND ${boardSql(board)} AND ${SEASON_FILTER_SQL}
          GROUP BY o.user_id`,
       )
       .all(userId, seasonId ?? null, seasonId ?? null) as {

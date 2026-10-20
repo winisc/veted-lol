@@ -3,6 +3,11 @@ import { reactionInfo, reactions, useLatestReaction, type ReactionId, type Shown
 import { splitRiotId } from '../lib/teams'
 import SummonerIcon from './ui/SummonerIcon'
 
+// Emoji da reação; `flip` vira de ponta-cabeça (o rato morto).
+function Emoji({ emoji, flip, className = '' }: { emoji: string; flip?: boolean; className?: string }) {
+  return <span className={`inline-block ${flip ? 'rotate-180' : ''} ${className}`}>{emoji}</span>
+}
+
 // Botões de reação rápida (emoji + frase curta).
 export function ReactionBar({ onReact }: { onReact: (id: ReactionId) => void }) {
   return (
@@ -15,7 +20,7 @@ export function ReactionBar({ onReact }: { onReact: (id: ReactionId) => void }) 
           title={r.label}
           className="flex items-center gap-1 rounded-full border border-rim bg-panel px-2.5 py-1 text-xs font-semibold text-gold-50 transition-colors hover:border-ash-dim hover:bg-rim active:scale-95"
         >
-          <span className="text-sm leading-none">{r.emoji}</span>
+          <Emoji emoji={r.emoji} flip={'flip' in r && r.flip} className="text-sm leading-none" />
           {r.label}
         </button>
       ))}
@@ -34,7 +39,7 @@ export function ReactionBubble({ userId }: { userId: number }) {
       className="reaction-pop pointer-events-none absolute -top-2 left-1 z-10 rounded-full border border-rim bg-abyss px-1.5 py-0.5 text-sm leading-none shadow-lg"
       title={info.label}
     >
-      {info.emoji}
+      <Emoji emoji={info.emoji} flip={info.flip} />
     </span>
   )
 }
@@ -52,7 +57,7 @@ export function ReactionFeed({ items, players }: { items: ShownReaction[]; playe
           <li key={item.id} className="reaction-feed flex items-center gap-2 rounded-full border border-rim bg-abyss/95 py-1 pl-1 pr-3 text-sm">
             <SummonerIcon iconId={player.iconId} size="xs" ring={player.team === 'blue' ? 'blue' : player.team === 'red' ? 'red' : 'dim'} />
             <span className="font-semibold text-gold-50">{splitRiotId(player.riotId)[0]}</span>
-            <span className="text-base leading-none">{info.emoji}</span>
+            <Emoji emoji={info.emoji} flip={info.flip} className="text-base leading-none" />
             <span className="text-ash">{info.label}</span>
           </li>
         )

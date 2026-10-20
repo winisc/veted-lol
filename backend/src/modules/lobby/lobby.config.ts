@@ -9,6 +9,7 @@ export const lobbyConfig = {
   orderMs: seconds('LOBBY_ORDER_SECONDS', 20), // modo tabela: o 2º colocado escolhe pickar primeiro ou segundo
   pickMs: seconds('LOBBY_PICK_SECONDS', 30), // tempo para cada pick
   doneMs: seconds('LOBBY_DONE_SECONDS', 5), // tela do draft finalizado, antes da partida começar
+  teamsMs: seconds('LOBBY_TEAMS_SECONDS', 10), // ARAM: tela dos times sorteados, antes da partida começar
   mvpMs: seconds('LOBBY_MVP_SECONDS', 30), // votação de MVP
   bagreMs: seconds('LOBBY_BAGRE_SECONDS', 30), // votação do bagre (o pior da partida)
   rematchMs: seconds('LOBBY_REMATCH_SECONDS', 5), // aviso de troca de lados antes da revanche
@@ -20,4 +21,6 @@ export const lobbyConfig = {
 
   // Votos para encerrar a partida e para decidir o vencedor/remake (limitado ao nº de jogadores).
   matchVotesNeeded: Number(process.env.MATCH_VOTES_NEEDED) || 6,
+  // ARAM (3x3, 4x4, 5x5): a mesma proporção, 60% dos jogadores (6 de 10, 5 de 8, 4 de 6).
+  aramVotesShare: 0.6,
 }

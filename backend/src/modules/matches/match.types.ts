@@ -41,6 +41,7 @@ export interface RankingRow extends PlayerStats {
 }
 
 export interface HistoryRow {
+  mode: QueueMode
   matchId: string
   endedAt: string
   durationSeconds: number

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQueue, type QueueSnapshot } from '../context/QueueContext'
-import { queueModeOrder, queueModes, type QueueMode } from '../lib/modes'
+import { aramModes, queueModeOrder, queueModes, type QueueMode } from '../lib/modes'
 import { formatDuration, splitRiotId } from '../lib/teams'
 import HexButton, { HexLink } from './ui/HexButton'
 import Notice from './ui/Notice'
@@ -152,6 +152,43 @@ function StandbyJoin({ waiting, max, busy, onClick }: { waiting: number; max: nu
   )
 }
 
+// ARAM: um cartão do mesmo tamanho dos outros, com os três tamanhos em linhas compactas (cada um é uma fila
+// própria). Sem capitães nem draft: os times saem sorteados, equilibrados pela tabela de ARAM.
+function AramCard({ snapshot, busy, onJoin }: { snapshot: QueueSnapshot; busy: boolean; onJoin: (mode: QueueMode) => void }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-rim bg-abyss/85 p-4 backdrop-blur-sm">
+      <div>
+        <p className="font-display text-xl text-gold-50">ARAM</p>
+        <p className="mt-0.5 text-sm text-ash">Times sorteados pela tabela de ARAM. Não precisa de roles.</p>
+      </div>
+      <ul className="mt-auto space-y-1">
+        {aramModes.map((mode) => {
+          const waiting = snapshot.sizes?.[mode] ?? 0
+          const required = snapshot.requiredByMode?.[mode]
+          return (
+            <li key={mode} className="flex items-center gap-2 rounded-md bg-panel py-1 pl-2.5 pr-1">
+              <span className="w-9 font-cond text-base font-bold text-gold-50">{queueModes[mode].short.replace('ARAM ', '')}</span>
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${waiting > 0 ? 'bg-hex-300' : 'bg-ash-dim'}`} />
+              <span className="flex-1 font-cond text-sm font-semibold tabular-nums text-gold-50/80">
+                {waiting}
+                {required ? `/${required}` : ''}
+              </span>
+              <button
+                type="button"
+                onClick={() => onJoin(mode)}
+                disabled={busy}
+                className="rounded-md bg-gold-200 px-3 py-1 text-xs font-semibold text-void transition-colors hover:bg-gold-50 disabled:opacity-50"
+              >
+                Entrar
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
 // Fora da fila: um cartão por modo, cada um com a sua fila.
 function ModePicker({
   snapshot,
@@ -165,7 +202,7 @@ function ModePicker({
   onStandby: (mode: QueueMode) => void
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {queueModeOrder.map((mode) => {
         const info = queueModes[mode]
         const waiting = snapshot.sizes?.[mode] ?? (snapshot.mode === mode ? snapshot.size : 0)
@@ -179,7 +216,7 @@ function ModePicker({
               <span className="flex items-center gap-2 text-sm text-gold-50/80">
                 <span className={`h-2 w-2 rounded-full ${waiting > 0 ? 'bg-hex-300' : 'bg-ash-dim'}`} />
                 <span className="font-cond text-base font-semibold tabular-nums">
-                  {waiting}/{snapshot.required}
+                  {waiting}/{snapshot.requiredByMode?.[mode] ?? snapshot.required}
                 </span>
                 na fila
               </span>
@@ -198,6 +235,7 @@ function ModePicker({
           </div>
         )
       })}
+      <AramCard snapshot={snapshot} busy={busy} onJoin={onJoin} />
     </div>
   )
 }

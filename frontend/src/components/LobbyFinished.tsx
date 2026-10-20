@@ -1,6 +1,6 @@
 import { useElapsed } from '../hooks/useElapsed'
 import type { LobbySnapshot, Side } from '../hooks/useLobby'
-import { queueModes } from '../lib/modes'
+import { isAramMode, queueModes } from '../lib/modes'
 import { sfx } from '../lib/sfx'
 import { formatDuration, sideStyle, splitRiotId, teamMembers } from '../lib/teams'
 import TeamCard from './TeamCard'
@@ -353,6 +353,7 @@ export default function LobbyFinished({ lobby, skew, busy, onRequeue, onLeave }:
             members={teamMembers(lobby, side)}
             mvpId={mvpRevealed ? match.mvpId : null}
             bagreId={bagreRevealed ? match.bagreId : null}
+            hideRoles={isAramMode(lobby.mode)}
             winner={winnerSide === side}
           />
         ))}

@@ -3,6 +3,6 @@ import { rankingService } from './ranking.service'
 
 export const rankingController = {
   list(req: Request, res: Response) {
-    res.json(rankingService.get(req.query.season))
+    res.json(rankingService.get(req.query.season, req.query.board))
   },
 }

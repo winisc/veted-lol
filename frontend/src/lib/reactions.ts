@@ -10,11 +10,14 @@ export const reactions = [
   { id: 'bagre', emoji: '🐟', label: 'Bagre!' },
   { id: 'carry', emoji: '⭐', label: 'Carregou' },
   { id: 'f', emoji: '💀', label: 'F' },
-] as const
+  { id: 'gelin', emoji: '🧊', label: 'Gelinho' },
+  { id: 'rato', emoji: '🐀', label: 'Febre do rato', flip: true }, // de ponta-cabeça (não existe emoji de rato morto)
+] as const satisfies readonly { id: string; emoji: string; label: string; flip?: boolean }[]
 
 export type ReactionId = (typeof reactions)[number]['id']
 
-export const reactionInfo = (id: string) => reactions.find((r) => r.id === id)
+export const reactionInfo = (id: string) =>
+  reactions.find((r) => r.id === id) as { id: string; emoji: string; label: string; flip?: boolean } | undefined
 
 export interface ShownReaction {
   id: string
