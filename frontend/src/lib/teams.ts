@@ -43,7 +43,10 @@ export function teamMembers(lobby: LobbySnapshot, side: Side): LobbyPlayer[] {
   const byId = (id: number | null) => lobby.players.find((p) => p.id === id)
   const captain = byId(lobby.draft.sides[side])
   const picked = lobby.draft.picks.filter((pk) => byId(pk.byId)?.team === side).map((pk) => byId(pk.playerId))
-  return [captain, ...picked].filter((p): p is LobbyPlayer => Boolean(p))
+  const ordered = [captain, ...picked].filter((p): p is LobbyPlayer => Boolean(p))
+  // Na ordem do draft (capitão e picks); quem entrou no time sem draft (ARAM, times sorteados) vem em seguida.
+  const rest = lobby.players.filter((p) => p.team === side && !ordered.includes(p))
+  return [...ordered, ...rest]
 }
 
 export function formatDuration(totalSeconds: number) {
