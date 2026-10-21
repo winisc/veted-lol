@@ -8,6 +8,8 @@ import { useProfilePath } from '../components/ui/PlayerLink'
 import { useApi } from '../hooks/useApi'
 import type { MatchOutcome, Side } from '../hooks/useLobby'
 import { formatDateTime } from '../lib/format'
+import type { PlayerGameStats } from '../hooks/useLobby'
+import ChampionKda from '../components/ui/ChampionKda'
 import { queueModes, type QueueMode } from '../lib/modes'
 import { formatDuration, short, sideStyle } from '../lib/teams'
 
@@ -22,6 +24,7 @@ interface MatchPlayer {
   pickedBy: number | null
   mvpVotes: number
   bagreVotes: number
+  stats?: Omit<PlayerGameStats, 'userId'> | null // do print do placar (ausente/null se não houve)
 }
 
 interface MatchDetailData {
@@ -110,6 +113,8 @@ export default function MatchDetail() {
                         </>
                       }
                       right={
+                        <span className="flex items-center gap-3">
+                        {p.stats && <ChampionKda stats={p.stats} detail />}
                         <span className="flex flex-col items-end text-xs leading-tight text-ash">
                           {p.isCaptain ? (
                             <span>Capitão</span>
@@ -133,6 +138,7 @@ export default function MatchDetail() {
                               )}
                             </span>
                           )}
+                        </span>
                         </span>
                       }
                     />

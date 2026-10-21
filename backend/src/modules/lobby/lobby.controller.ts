@@ -39,6 +39,19 @@ export const lobbyController = {
     res.json({ lobby: lobbyService.voteResult(req.userId!, req.body?.choice) })
   },
 
+  async statsScreenshot(req: AuthRequest, res: Response) {
+    const image = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0)
+    res.json({ draft: await lobbyService.readStatsScreenshot(req.userId!, image) })
+  },
+
+  stats(req: AuthRequest, res: Response) {
+    res.json({ lobby: lobbyService.submitStats(req.userId!, req.body) })
+  },
+
+  skipStats(req: AuthRequest, res: Response) {
+    res.json({ lobby: lobbyService.skipStats(req.userId!) })
+  },
+
   mvp(req: AuthRequest, res: Response) {
     res.json({ lobby: lobbyService.voteMvp(req.userId!, req.body?.targetId) })
   },

@@ -83,6 +83,21 @@ db.exec(`
     PRIMARY KEY (season_id, user_id)
   );
 
+  -- Números de cada jogador numa partida, tirados do print do placar (só partidas em que o capitão enviou).
+  CREATE TABLE IF NOT EXISTS match_player_stats (
+    match_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    champion TEXT NOT NULL,
+    kills INTEGER NOT NULL,
+    deaths INTEGER NOT NULL,
+    assists INTEGER NOT NULL,
+    cs INTEGER,
+    gold INTEGER,
+    damage INTEGER,
+    PRIMARY KEY (match_id, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_match_player_stats_user ON match_player_stats (user_id);
+
   -- Riot IDs banidos (com ou sem conta). Quem está aqui não loga nem se cadastra.
   CREATE TABLE IF NOT EXISTS bans (
     game_name TEXT NOT NULL,

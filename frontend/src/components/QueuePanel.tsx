@@ -202,7 +202,9 @@ function ModePicker({
   onStandby: (mode: QueueMode) => void
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    // As colunas seguem a largura do próprio painel (não da janela): 3 lado a lado só quando cabem de verdade.
+    <div className="@container">
+    <div className="grid gap-3 @md:grid-cols-2 @[50rem]:grid-cols-3">
       {queueModeOrder.map((mode) => {
         const info = queueModes[mode]
         const waiting = snapshot.sizes?.[mode] ?? (snapshot.mode === mode ? snapshot.size : 0)
@@ -212,7 +214,7 @@ function ModePicker({
               <p className="font-display text-xl text-gold-50">{info.name}</p>
               <p className="mt-0.5 text-sm text-ash">{info.description}</p>
             </div>
-            <div className="mt-auto flex items-center justify-between gap-3">
+            <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
               <span className="flex items-center gap-2 whitespace-nowrap text-sm text-gold-50/80">
                 <span className={`h-2 w-2 rounded-full ${waiting > 0 ? 'bg-hex-300' : 'bg-ash-dim'}`} />
                 <span className="font-cond text-base font-semibold tabular-nums">
@@ -221,7 +223,7 @@ function ModePicker({
                 na fila
               </span>
               <HexButton onClick={() => onJoin(mode)} disabled={busy}>
-                Entrar na fila
+                Entrar
               </HexButton>
             </div>
             {snapshot.standbyMax !== undefined && (
@@ -236,6 +238,7 @@ function ModePicker({
         )
       })}
       <AramCard snapshot={snapshot} busy={busy} onJoin={onJoin} />
+    </div>
     </div>
   )
 }

@@ -1,4 +1,5 @@
-import type { LobbyPlayer, Side } from '../hooks/useLobby'
+import type { LobbyPlayer, PlayerGameStats, Side } from '../hooks/useLobby'
+import ChampionKda from './ui/ChampionKda'
 import { sideStyle } from '../lib/teams'
 import { BagreBadge, CaptainBadge, MvpBadge, YouBadge } from './ui/Badges'
 import { useProfilePath } from './ui/PlayerLink'
@@ -18,9 +19,10 @@ interface Props {
   winner?: boolean
   title?: string
   hideRoles?: boolean // ARAM: não tem role
+  stats?: PlayerGameStats[] | null // números do print do placar: campeão e KDA no lugar das roles
 }
 
-export default function TeamCard({ side, members, slots, mvpId, bagreId, winner, title, hideRoles }: Props) {
+export default function TeamCard({ side, members, slots, mvpId, bagreId, winner, title, hideRoles, stats }: Props) {
   const style = sideStyle[side]
   const profilePath = useProfilePath()
   const rows = Array.from({ length: Math.max(slots ?? 0, members.length) }, (_, i) => members[i])
@@ -49,7 +51,11 @@ export default function TeamCard({ side, members, slots, mvpId, bagreId, winner,
                 fullName
                 hideTag
                 iconBadge={<RankBadge position={member.rankPosition} overlay />}
-                right={hideRoles ? undefined : <RoleIcons roles={member.roles} />}
+                right={(() => {
+                  const mine = stats?.find((s) => s.userId === member.id)
+                  if (mine) return <ChampionKda stats={mine} />
+                  return hideRoles ? undefined : <RoleIcons roles={member.roles} />
+                })()}
                 badges={
                   <>
                     <EloBadge elo={member.elo} compact />

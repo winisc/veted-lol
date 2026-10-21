@@ -354,6 +354,7 @@ export default function LobbyFinished({ lobby, skew, busy, onRequeue, onLeave }:
             mvpId={mvpRevealed ? match.mvpId : null}
             bagreId={bagreRevealed ? match.bagreId : null}
             hideRoles={isAramMode(lobby.mode)}
+            stats={match.gameStats}
             winner={winnerSide === side}
           />
         ))}

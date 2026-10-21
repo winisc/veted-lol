@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import express, { Router } from 'express'
 import { requireAuth } from '../../shared/middlewares/auth.middleware'
 import { lobbyController } from './lobby.controller'
 
@@ -16,6 +16,14 @@ lobbyRoutes.post('/side', lobbyController.side)
 lobbyRoutes.post('/pick', lobbyController.pick)
 lobbyRoutes.post('/end', lobbyController.end)
 lobbyRoutes.post('/result', lobbyController.result)
+// Print do placar: a imagem vai crua no corpo (PNG, JPG ou WebP, até 10 MB).
+lobbyRoutes.post(
+  '/stats/screenshot',
+  express.raw({ type: ['image/png', 'image/jpeg', 'image/webp'], limit: '10mb' }),
+  lobbyController.statsScreenshot,
+)
+lobbyRoutes.post('/stats', lobbyController.stats)
+lobbyRoutes.post('/stats/skip', lobbyController.skipStats)
 lobbyRoutes.post('/mvp', lobbyController.mvp)
 lobbyRoutes.post('/bagre', lobbyController.bagre)
 lobbyRoutes.post('/rematch', lobbyController.rematch)

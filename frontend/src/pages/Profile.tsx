@@ -14,6 +14,7 @@ import {
 import ProfileExtra, {
   type ProfileExtraData,
 } from "../components/ProfileExtra";
+import ProfileGameStats from "../components/ProfileGameStats";
 import ProfileSeasons, {
   type SeasonResult,
 } from "../components/ProfileSeasons";
@@ -337,6 +338,8 @@ export default function Profile() {
           )}
         />
       )}
+
+      {extra?.game && <ProfileGameStats data={extra.game} seasonId={season?.id} />}
 
       <Panel
         title={viewingOther ? "Partidas recentes" : "Histórico de partidas"}

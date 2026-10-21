@@ -1,4 +1,5 @@
 import type { QueueMode } from '../../shared/types/modes'
+import type { PlayerGameStats } from '../scoreboard/scoreboard.types'
 
 export type Side = 'blue' | 'red'
 export type MatchOutcome = Side | 'remake'
@@ -22,6 +23,7 @@ export interface NewMatch {
   bagreId: number | null
   players: { userId: number; side: Side; isCaptain: boolean; pickOrder: number | null; pickedBy: number | null }[]
   votes: MatchVote[] // votos de MVP e bagre, guardados para auditoria do admin
+  gameStats: PlayerGameStats[] // números do print do placar (vazio se o capitão pulou)
 }
 
 // Contagem de partidas de um jogador. Remakes não entram.
@@ -75,6 +77,7 @@ export interface MatchDetail {
     pickedBy: number | null // capitão que escolheu
     mvpVotes: number
     bagreVotes: number
+    stats: Omit<PlayerGameStats, 'userId'> | null // do print do placar (null se não houve)
   }[]
   hasVotes: boolean // se a contagem de votos foi guardada (partidas antigas não têm)
 }

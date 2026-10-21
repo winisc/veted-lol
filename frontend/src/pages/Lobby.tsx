@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LobbyAramTeams from '../components/LobbyAramTeams'
 import LobbyAwardVote from '../components/LobbyAwardVote'
+import LobbyStats from '../components/LobbyStats'
 import LobbyCaptains from '../components/LobbyCaptains'
 import LobbyCoinFlip from '../components/LobbyCoinFlip'
 import LobbyDraft from '../components/LobbyDraft'
@@ -29,7 +30,7 @@ const stages: { label: string; phases: LobbyPhase[] }[] = [
   { label: 'Sorteio', phases: ['coinflip', 'order', 'side'] },
   { label: 'Draft', phases: ['picking', 'done'] },
   { label: 'Partida', phases: ['playing'] },
-  { label: 'Resultado', phases: ['result', 'mvp', 'bagre'] },
+  { label: 'Resultado', phases: ['result', 'stats', 'mvp', 'bagre'] },
   { label: 'Fim', phases: ['finished', 'rematch'] },
 ]
 
@@ -86,6 +87,8 @@ export default function Lobby() {
     voteResult,
     voteMvp,
     voteBagre,
+    submitStats,
+    skipStats,
     leave,
     reactions,
     react,
@@ -105,7 +108,8 @@ export default function Lobby() {
   const finished = lobby.phase === 'finished'
   const rematching = lobby.phase === 'rematch'
   // Durante a partida não dá para sair (o servidor também bloqueia).
-  const inMatch = lobby.phase === 'playing' || lobby.phase === 'result' || lobby.phase === 'mvp' || lobby.phase === 'bagre'
+  const inMatch =
+    lobby.phase === 'playing' || lobby.phase === 'result' || lobby.phase === 'stats' || lobby.phase === 'mvp' || lobby.phase === 'bagre'
 
   // Antes da partida começar, sair cancela o lobby para todos (na contagem da revanche, cancela a revanche):
   // por isso pede confirmação. Depois da partida, cada um sai por si, sem perguntar.
@@ -178,7 +182,10 @@ export default function Lobby() {
             )}
             {lobby.phase === 'playing' && <LobbyPlaying lobby={lobby} skew={skew} busy={busy} onVoteEnd={voteEnd} />}
             {lobby.phase === 'result' && <LobbyResult lobby={lobby} skew={skew} busy={busy} onVote={voteResult} />}
-            {lobby.phase === 'mvp' && <LobbyAwardVote kind="mvp" lobby={lobby} skew={skew} busy={busy} onVote={voteMvp} />}
+            {lobby.phase === 'stats' && (
+            <LobbyStats lobby={lobby} busy={busy} onSubmit={submitStats} onSkip={skipStats} />
+          )}
+          {lobby.phase === 'mvp' && <LobbyAwardVote kind="mvp" lobby={lobby} skew={skew} busy={busy} onVote={voteMvp} />}
             {lobby.phase === 'bagre' && (
               <LobbyAwardVote kind="bagre" lobby={lobby} skew={skew} busy={busy} onVote={voteBagre} />
             )}

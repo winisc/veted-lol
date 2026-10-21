@@ -3,6 +3,7 @@ import { resolveIconId } from '../../shared/utils/icons'
 import { formatRiotId } from '../../shared/utils/riotId'
 import { boardSql, type Board } from '../../shared/types/modes'
 import { LEGACY_SEASON_ID } from '../seasons/season.constants'
+import type { PlayerGameStats } from '../scoreboard/scoreboard.types'
 import type { AdminMatch, AdminMatchPlayerRow, MatchDetail, MatchVote, PlayerResult, Rival, HistoryRow, MatchOutcome, NewMatch, PlayerStats, RankingRow } from './match.types'
 
 const insertMatch = db.prepare(
@@ -12,6 +13,9 @@ const insertPlayer = db.prepare(
   'INSERT INTO match_players (match_id, user_id, side, is_captain, result, is_mvp, is_bagre, pick_order, picked_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
 )
 const insertVote = db.prepare('INSERT INTO match_votes (match_id, kind, voter_id, target_id) VALUES (?, ?, ?, ?)')
+const insertStats = db.prepare(
+  'INSERT INTO match_player_stats (match_id, user_id, champion, kills, deaths, assists, cs, gold, damage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+)
 
 // Tudo ou nada: a partida e os 10 jogadores são gravados na mesma transação.
 const saveTransaction = db.transaction((match: NewMatch) => {
@@ -43,6 +47,9 @@ const saveTransaction = db.transaction((match: NewMatch) => {
     )
   }
   for (const vote of match.votes) insertVote.run(match.id, vote.kind, vote.voterId, vote.targetId)
+  for (const s of match.gameStats ?? []) {
+    insertStats.run(match.id, s.userId, s.champion, s.kills, s.deaths, s.assists, s.cs, s.gold, s.damage)
+  }
 })
 
 // Filtro opcional por season (a partida sem season, de antes das seasons, vale como a season antiga).
@@ -166,6 +173,15 @@ export const matchRepository = {
       .prepare('SELECT kind, target_id AS targetId, COUNT(*) AS n FROM match_votes WHERE match_id = ? GROUP BY kind, target_id')
       .all(matchId) as { kind: string; targetId: number; n: number }[]
     const countFor = (kind: string, userId: number) => votes.find((v) => v.kind === kind && v.targetId === userId)?.n ?? 0
+    const stats = db
+      .prepare('SELECT user_id AS userId, champion, kills, deaths, assists, cs, gold, damage FROM match_player_stats WHERE match_id = ?')
+      .all(matchId) as PlayerGameStats[]
+    const statsOf = (userId: number) => {
+      const row = stats.find((s) => s.userId === userId)
+      if (!row) return null
+      const { userId: _id, ...rest } = row
+      return rest
+    }
 
     return {
       ...match,
@@ -181,6 +197,7 @@ export const matchRepository = {
         pickedBy: p.pickedBy,
         mvpVotes: countFor('mvp', p.userId),
         bagreVotes: countFor('bagre', p.userId),
+        stats: statsOf(p.userId),
       })),
     }
   },
@@ -268,6 +285,40 @@ export const matchRepository = {
     }))
   },
 
+  // Números do jogador nas partidas com print do placar (sem remakes), para o perfil: médias e campeões.
+  // Com `seasonId`, só as partidas dessa season.
+  gameStatsForUser(userId: number, seasonId?: number) {
+    const params = [userId, seasonId ?? null, seasonId ?? null]
+    const where = `s.user_id = ? AND mp.result != 'remake' AND ${SEASON_FILTER_SQL}`
+    const from = `FROM match_player_stats s
+         JOIN matches m ON m.id = s.match_id
+         JOIN match_players mp ON mp.match_id = s.match_id AND mp.user_id = s.user_id`
+    const totals = db
+      .prepare(
+        `SELECT COUNT(*) AS games, SUM(s.kills) AS kills, SUM(s.deaths) AS deaths, SUM(s.assists) AS assists,
+                AVG(s.cs) AS cs, AVG(s.gold) AS gold, AVG(s.damage) AS damage
+         ${from} WHERE ${where}`,
+      )
+      .get(...params) as {
+      games: number
+      kills: number | null
+      deaths: number | null
+      assists: number | null
+      cs: number | null
+      gold: number | null
+      damage: number | null
+    }
+    const champions = db
+      .prepare(
+        `SELECT s.champion AS champion, COUNT(*) AS games, SUM(mp.result = 'win') AS wins,
+                SUM(s.kills) AS kills, SUM(s.deaths) AS deaths, SUM(s.assists) AS assists
+         ${from} WHERE ${where}
+         GROUP BY s.champion ORDER BY games DESC, wins DESC LIMIT 5`,
+      )
+      .all(...params) as { champion: string; games: number; wins: number; kills: number; deaths: number; assists: number }[]
+    return { totals, champions }
+  },
+
   // ---- Admin ----
 
   // Partidas mais recentes com os jogadores de cada uma.
@@ -340,6 +391,7 @@ export const matchRepository = {
   delete(matchId: string): boolean {
     const remove = db.transaction(() => {
       db.prepare('DELETE FROM match_votes WHERE match_id = ?').run(matchId)
+      db.prepare('DELETE FROM match_player_stats WHERE match_id = ?').run(matchId)
       db.prepare('DELETE FROM match_players WHERE match_id = ?').run(matchId)
       return db.prepare('DELETE FROM matches WHERE id = ?').run(matchId).changes > 0
     })

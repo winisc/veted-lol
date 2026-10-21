@@ -18,6 +18,7 @@ export type LobbyPhase =
   | 'done'
   | 'playing'
   | 'result'
+  | 'stats' // capitão vencedor envia o print do placar e confere os números
   | 'mvp'
   | 'bagre'
   | 'finished'
@@ -77,10 +78,31 @@ export interface MatchSnapshot {
   myBagreVote: number | null
   bagreCounts: Record<number, number> | null
   bagreId: number | null
+  statsUploaderId?: number | null // capitão vencedor: quem envia o print do placar (ausente em servidores antigos)
+  gameStats?: PlayerGameStats[] | null // números de cada jogador, do print (null = pulado / ainda não enviado)
   gameNumber: number
   rematchVotes: number
   iVotedRematch: boolean
   rematchAvailable: boolean
+}
+
+// Números de um jogador na partida, do print do placar.
+export interface PlayerGameStats {
+  userId: number
+  champion: string // id do Data Dragon (ex.: "MonkeyKing")
+  kills: number
+  deaths: number
+  assists: number
+  cs: number | null
+  gold: number | null
+  damage: number | null
+}
+
+// O que a leitura do print conseguiu tirar (null = não leu; o capitão preenche na conferência).
+export interface StatsDraft {
+  read: boolean
+  note?: string
+  rows: { [K in keyof PlayerGameStats]: K extends 'userId' ? number : PlayerGameStats[K] | null }[]
 }
 
 export interface LobbySnapshot {
@@ -163,6 +185,9 @@ export function useLobby() {
   const voteResult = useCallback((choice: MatchOutcome) => act('/lobby/result', { choice }), [act])
   const voteMvp = useCallback((targetId: number) => act('/lobby/mvp', { targetId }), [act])
   const voteBagre = useCallback((targetId: number) => act('/lobby/bagre', { targetId }), [act])
+  // Print do placar: o capitão vencedor confirma os números conferidos, ou pula.
+  const submitStats = useCallback((rows: PlayerGameStats[]) => act('/lobby/stats', { rows }), [act])
+  const skipStats = useCallback(() => act('/lobby/stats/skip', {}), [act])
   // Reação rápida: sem "carregando" nem mensagem de erro (se vier rápido demais, só não aparece).
   const react = useCallback(async (reaction: string) => {
     try {
@@ -201,6 +226,8 @@ export function useLobby() {
     voteResult,
     voteMvp,
     voteBagre,
+    submitStats,
+    skipStats,
     voteRematch,
     leave,
     reactions,

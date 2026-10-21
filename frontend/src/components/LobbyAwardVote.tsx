@@ -6,6 +6,7 @@ import { CaptainBadge, YouBadge } from './ui/Badges'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { FishIcon, StarIcon } from './ui/icons'
 import PlayerTile from './ui/PlayerTile'
+import ChampionKda from './ui/ChampionKda'
 import SectionTitle from './ui/SectionTitle'
 import SummonerIcon from './ui/SummonerIcon'
 import type { IconRing } from './ui/SummonerIcon'
@@ -84,6 +85,8 @@ export default function LobbyAwardVote({ kind, lobby, skew, busy, onVote }: Prop
 
   const [pendingName, pendingTag] = pending ? splitRiotId(pending.riotId) : ['', '']
 
+  const stats = (id: number) => lobby.match.gameStats?.find((s) => s.userId === id)
+
   return (
     <div className="space-y-4">
       <SectionTitle
@@ -123,8 +126,9 @@ export default function LobbyAwardVote({ kind, lobby, skew, busy, onVote }: Prop
                 onClick={voted || blocked ? undefined : () => setPending(player)}
                 disabled={busy}
                 footer={
-                  (player.isYou || player.isCaptain || selected) && (
+                  (player.isYou || player.isCaptain || selected || stats(player.id)) && (
                     <>
+                      {stats(player.id) && <ChampionKda stats={stats(player.id)!} />}
                       {player.isYou && <YouBadge />}
                       {player.isCaptain && <CaptainBadge withLabel={false} />}
                       {selected && <span className="text-xs font-semibold text-gold-200">Seu voto</span>}

@@ -3,6 +3,7 @@ import { formatPercent } from '../lib/format'
 import { splitRiotId } from '../lib/teams'
 import Panel from './ui/Panel'
 import PlayerLink from './ui/PlayerLink'
+import type { ProfileGameStatsData } from './ProfileGameStats'
 import SummonerIcon from './ui/SummonerIcon'
 
 export interface Rival {
@@ -18,6 +19,7 @@ export interface ProfileExtraData {
   streaks: { current: { type: 'win' | 'loss' | null; count: number }; bestWin: number; worstLoss: number }
   rivals: { victim: Rival | null; nemesis: Rival | null }
   duos?: { best: Rival | null; worst: Rival | null } // ausente em servidores antigos
+  game?: ProfileGameStatsData | null // do print do placar (null enquanto não houver partida com print)
 }
 
 function Card({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {

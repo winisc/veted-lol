@@ -2,6 +2,7 @@ import type { QueueMode } from '../../shared/types/modes'
 import type { PlayerRoles } from '../../shared/types/roles'
 import type { PlayerElo } from '../riot/elo.service'
 import type { MatchOutcome, Side } from '../matches/match.types'
+import type { PlayerGameStats } from '../scoreboard/scoreboard.types'
 
 export type { MatchOutcome, Side }
 
@@ -19,6 +20,7 @@ export type LobbyPhase =
   | 'done'
   | 'playing'
   | 'result'
+  | 'stats' // capitão vencedor envia o print do placar e confere os números (5x5; pode pular)
   | 'mvp'
   | 'bagre' // votação do pior jogador da partida, entre os perdedores
   | 'finished'
@@ -71,6 +73,7 @@ export interface Lobby {
   mvpId: number | null
   bagreVotes: Map<number, number> // quem votou -> em quem votou
   bagreId: number | null
+  gameStats?: PlayerGameStats[] | null // números de cada jogador, do print do placar (null = pulado)
   matchId: string // id da partida no histórico; muda a cada revanche
   gameNumber: number // 1 = primeira partida do lobby; sobe a cada "jogar novamente"
   rematchVotes: Set<number> // quem votou para jogar novamente
@@ -109,6 +112,8 @@ export interface MatchSnapshot {
   myBagreVote: number | null
   bagreCounts: Record<number, number> | null // só depois do fim da votação do bagre
   bagreId: number | null
+  statsUploaderId: number | null // quem envia o print do placar (o capitão do time vencedor)
+  gameStats: PlayerGameStats[] | null // números de cada jogador (depois de enviados e conferidos)
   gameNumber: number
   rematchVotes: number
   iVotedRematch: boolean

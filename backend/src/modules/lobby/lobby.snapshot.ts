@@ -39,6 +39,13 @@ export function currentPickerId(lobby: Lobby): number | null {
   return lobby.phase === 'picking' ? (lobby.pickOrder[lobby.pickIndex] ?? null) : null
 }
 
+// Capitão do time vencedor: quem envia o print do placar no fim da partida.
+export function statsUploaderId(lobby: Lobby): number | null {
+  if (lobby.outcome !== 'blue' && lobby.outcome !== 'red') return null
+  const winners = lobby.teams[lobby.outcome]
+  return lobby.captains.find((id) => winners.includes(id)) ?? null
+}
+
 // Jogadores do time vencedor: são os candidatos a MVP.
 export function mvpCandidates(lobby: Lobby): number[] {
   return lobby.outcome === 'blue' || lobby.outcome === 'red' ? lobby.teams[lobby.outcome] : []
@@ -126,6 +133,8 @@ export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
       myBagreVote: lobby.bagreVotes.get(userId) ?? null,
       bagreCounts: votesRevealed ? Object.fromEntries(countBagreVotes(lobby)) : null,
       bagreId: lobby.bagreId,
+      statsUploaderId: statsUploaderId(lobby),
+      gameStats: lobby.gameStats ?? null,
       gameNumber: lobby.gameNumber,
       rematchVotes: lobby.rematchVotes.size,
       iVotedRematch: lobby.rematchVotes.has(userId),

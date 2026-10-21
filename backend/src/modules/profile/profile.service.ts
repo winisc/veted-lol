@@ -11,6 +11,34 @@ import { seasonService } from '../seasons/season.service'
 import { userRepository } from '../users/user.repository'
 
 const HISTORY_LIMIT = 20
+
+// KDA = (abates + assistências) / mortes; sem morte, conta como 1 morte (o "Perfect" do LoL vira um número alto).
+const kda = (kills: number, deaths: number, assists: number) => Math.round(((kills + assists) / Math.max(1, deaths)) * 100) / 100
+
+// Números das partidas com print do placar na season: médias e os campeões mais jogados.
+function gameStats(userId: number, seasonId: number) {
+  const { totals, champions } = matchRepository.gameStatsForUser(userId, seasonId)
+  if (!totals.games) return null
+  const per = (total: number | null) => Math.round(((total ?? 0) / totals.games) * 10) / 10
+  const round = (value: number | null) => (value === null ? null : Math.round(value))
+  return {
+    games: totals.games,
+    kills: per(totals.kills),
+    deaths: per(totals.deaths),
+    assists: per(totals.assists),
+    kda: kda(totals.kills ?? 0, totals.deaths ?? 0, totals.assists ?? 0),
+    cs: round(totals.cs),
+    gold: round(totals.gold),
+    damage: round(totals.damage),
+    champions: champions.map((c) => ({
+      champion: c.champion,
+      games: c.games,
+      wins: c.wins,
+      winRate: winRate(c.wins, c.games - c.wins),
+      kda: kda(c.kills, c.deaths, c.assists),
+    })),
+  }
+}
 const SEASONS_SHOWN = 12 // a atual e as mais recentes encerradas
 
 // Sequências de resultados (do mais recente para o mais antigo, sem remakes).
@@ -136,6 +164,7 @@ export const profileService = {
         streaks: streaks(matchRepository.resultsForUser(userId, season.id)),
         rivals: rivals(userId, season.id),
         duos: duos(userId, season.id),
+        game: gameStats(userId, season.id), // do print do placar (null enquanto não tiver nenhuma partida com print)
       },
       history: matchRepository.historyForUser(userId, HISTORY_LIMIT).map((match) => ({
         ...match,

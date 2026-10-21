@@ -22,6 +22,27 @@ export class ApiError extends Error {
   }
 }
 
+// Envia um arquivo cru no corpo (ex.: o print do placar), com o mesmo tratamento de erro do `api`.
+export async function apiUpload<T>(path: string, file: Blob): Promise<T> {
+  const token = tokenStorage.get()
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: file,
+    })
+  } catch {
+    throw new ApiError('Não foi possível conectar ao servidor.', 0)
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    if (data.code === 'BANNED' && token) window.dispatchEvent(new CustomEvent(BANNED_EVENT))
+    throw new ApiError(data.error ?? (res.status === 413 ? 'Imagem grande demais (até 10 MB).' : 'Erro inesperado.'), res.status, data.code)
+  }
+  return data as T
+}
+
 export async function api<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
   const token = tokenStorage.get()
 

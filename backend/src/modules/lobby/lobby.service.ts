@@ -16,8 +16,12 @@ import {
   draftPool,
   mvpCandidates,
   snapshotFor,
+  statsUploaderId,
   votesNeeded,
 } from './lobby.snapshot'
+import { readScoreboard } from '../scoreboard/scoreboard.reader'
+import type { StatsDraft } from '../scoreboard/scoreboard.types'
+import { validateStats } from '../scoreboard/scoreboard.validate'
 import type { Lobby, LobbyEvent, LobbyPhase, LobbyPlayer, LobbySnapshot, MatchOutcome, Side } from './lobby.types'
 import { boardOf, isAramMode, type QueueMode } from '../../shared/types/modes'
 import { matchRepository } from '../matches/match.repository'
@@ -249,7 +253,21 @@ function settleResult(lobby: Lobby, outcome: MatchOutcome) {
   lobby.outcome = outcome
   // Remake não tem vencedor, MVP nem bagre.
   if (outcome === 'remake') finishMatch(lobby)
-  else setPhase(lobby, 'mvp', lobbyConfig.mvpMs, () => finishMvp(lobby))
+  // 5x5: o capitão vencedor envia o print do placar antes do MVP (sem prazo; ele pode pular). ARAM não tem capitão.
+  else if (statsUploaderId(lobby) !== null) setPhase(lobby, 'stats', null)
+  else startMvp(lobby)
+}
+
+function startMvp(lobby: Lobby) {
+  setPhase(lobby, 'mvp', lobbyConfig.mvpMs, () => finishMvp(lobby))
+}
+
+// Só o capitão vencedor, e só no passo do print.
+function requireStatsUploader(userId: number): Lobby {
+  const lobby = requireLobby(userId)
+  if (lobby.phase !== 'stats') throw new AppError('Não é o momento de enviar o print da partida.', 409)
+  if (statsUploaderId(lobby) !== userId) throw new AppError('Só o capitão do time vencedor envia o print.', 403)
+  return lobby
 }
 
 // O mais votado leva (MVP ou bagre); empate é sorteado; sem nenhum voto, ninguém leva.
@@ -284,6 +302,7 @@ function startRematch(lobby: Lobby) {
   lobby.mvpId = null
   lobby.bagreVotes = new Map()
   lobby.bagreId = null
+  lobby.gameStats = null
   lobby.rematchVotes = new Set()
 
   startPlaying(lobby)
@@ -345,6 +364,7 @@ function finishMatch(lobby: Lobby) {
           pickedBy: pick?.byId ?? null,
         }
       }),
+      gameStats: lobby.gameStats ?? [],
     })
   } catch (err) {
     // Não trava os jogadores se o banco falhar; o resultado ainda aparece na tela.
@@ -380,7 +400,13 @@ function cancelLobby(lobby: Lobby, notice: string, causedBy?: number) {
 
 // Da partida começar até o histórico ser salvo: ninguém sai e o admin pode forçar o resultado.
 function inMatch(lobby: Lobby) {
-  return lobby.phase === 'playing' || lobby.phase === 'result' || lobby.phase === 'mvp' || lobby.phase === 'bagre'
+  return (
+    lobby.phase === 'playing' ||
+    lobby.phase === 'result' ||
+    lobby.phase === 'stats' ||
+    lobby.phase === 'mvp' ||
+    lobby.phase === 'bagre'
+  )
 }
 
 function requireLobby(userId: number): Lobby {
@@ -592,6 +618,34 @@ export const lobbyService = {
     lobby.resultVotes.set(userId, choice)
     if (countResultVotes(lobby)[choice] >= votesNeeded(lobby)) settleResult(lobby, choice)
     else broadcast(lobby)
+    return snapshotFor(lobby, userId)
+  },
+
+  // Capitão vencedor envia o print do placar: devolve o que deu para ler, para ele conferir (nada é salvo ainda).
+  async readStatsScreenshot(userId: number, image: Buffer): Promise<StatsDraft> {
+    const lobby = requireStatsUploader(userId)
+    if (!image?.length) throw new AppError('Envie a imagem do placar (PNG ou JPG).', 400)
+    const players = lobby.players.map((p) => ({
+      userId: p.userId,
+      riotId: p.riotId,
+      side: lobby.teams.blue.includes(p.userId) ? ('blue' as const) : ('red' as const),
+    }))
+    return readScoreboard(image, players)
+  },
+
+  // Dados conferidos pelo capitão vencedor: guarda e segue para o MVP.
+  submitStats(userId: number, body: unknown): LobbySnapshot {
+    const lobby = requireStatsUploader(userId)
+    lobby.gameStats = validateStats(body, lobby.players.map((p) => p.userId))
+    startMvp(lobby)
+    return snapshotFor(lobby, userId)
+  },
+
+  // O capitão vencedor pula o print: segue para o MVP sem os números da partida.
+  skipStats(userId: number): LobbySnapshot {
+    const lobby = requireStatsUploader(userId)
+    lobby.gameStats = null
+    startMvp(lobby)
     return snapshotFor(lobby, userId)
   },
 
