@@ -8,13 +8,13 @@ import type { StatsDraft, StatsDraftRow } from './scoreboard.types'
 // Leitura do print do placar, em dois layouts do cliente do LoL (aba "Placar"):
 //
 //  A. Tela de fim de partida: linhas com barra colorida à esquerda (azul = Equipe 1, vermelho = Equipe 2), nome do
-//     campeão escrito, KDA, razão A/M/A, dano a campeões e ouro (sem CS).
+//     campeão escrito, KDA e a razão A/M/A (que confere o KDA).
 //     As 10 linhas são achadas pelas barras; cada linha é recortada em posições fixas relativas à barra.
-//  B. Detalhe da partida no histórico: sem barras, campeão só no ícone redondo, KDA, CS e ouro (sem dano).
+//  B. Detalhe da partida no histórico: sem barras, campeão só no ícone redondo e KDA.
 //     As âncoras são as palavras "EQUIPE 1" e "EQUIPE 2" (achadas por OCR na imagem inteira); o campeão sai
 //     comparando o ícone com os ícones oficiais do Data Dragon.
 //
-// Nos dois, o nick é comparado com os jogadores do lobby (tolerando erros de leitura) e o OCR de cada campo usa só
+// Só campeão e KDA são lidos. Nos dois, o nick é comparado com os jogadores do lobby (tolerando erros de leitura) e o OCR de cada campo usa só
 // os caracteres possíveis. As medidas são dos prints de referência (A: janela 1280x720; B: o mesmo, sem a borda).
 
 const REF_ROW_PITCH = 41 // de uma linha para a próxima (40px de linha + 1px de divisória)
@@ -24,8 +24,6 @@ const BOX = {
   champ: { dx: 144, dy: 20, w: 160, h: 13 },
   kda: { dx: 663, dy: 5, w: 85, h: 14 },
   ratio: { dx: 663, dy: 20, w: 50, h: 13 },
-  damage: { dx: 753, dy: 4, w: 75, h: 16 },
-  gold: { dx: 843, dy: 4, w: 80, h: 16 },
 }
 
 // Layout B (histórico), relativo ao canto do "EQUIPE" de cada time: distância entre "EQUIPE 1" e "EQUIPE 2",
@@ -36,8 +34,6 @@ const HISTORY = {
   pitch: 29,
   nick: { dx: 94, dy: 0, w: 140, h: 14 },
   kda: { dx: 408, dy: 0, w: 84, h: 14 },
-  cs: { dx: 510, dy: 0, w: 50, h: 14 },
-  gold: { dx: 566, dy: 0, w: 72, h: 14 },
   icon: { dx: 73.5, dy: 7, r: 10 }, // centro e raio do retrato do campeão
 }
 
@@ -165,11 +161,6 @@ function parseKda(raw: string, ratioText: string): [number, number, number] | nu
   const exact = original.length === 3 && original.every((p) => p !== '' && p.length <= 2) ? (original.map(Number) as [number, number, number]) : null
   if (exact && (fits(...exact) || !ratioText)) return exact
   return candidates.find((c) => fits(...c)) ?? exact ?? null
-}
-
-const parseNumber = (text: string) => {
-  const digits = text.replace(/[^0-9]/g, '')
-  return digits ? Number(digits) : null
 }
 
 // ---- OCR ----
@@ -501,7 +492,7 @@ export async function readScoreboard(imageData: Buffer, players: ScoreboardPlaye
     const list = await championList().catch(() => [] as { id: string; name: string }[])
 
     // Cada linha lida: nick e os números (o campeão já sai como id do Data Dragon).
-    const lines: { nick: string; champion: string | null; kda: [number, number, number] | null; cs: number | null; gold: number | null; damage: number | null }[] = []
+    const lines: { nick: string; champion: string | null; kda: [number, number, number] | null }[] = []
     let layout: 'end' | 'history'
 
     const grid = await findGrid(image)
@@ -514,9 +505,6 @@ export async function readScoreboard(imageData: Buffer, players: ScoreboardPlaye
           nick: await readBox(image, size, origin, BOX.nick, LETTERS),
           champion: list.length ? matchChampion(champ, list) : null,
           kda: parseKda(await readBox(image, size, origin, BOX.kda, '0123456789/'), await readBox(image, size, origin, BOX.ratio, '0123456789,')),
-          cs: null,
-          damage: parseNumber(await readBox(image, size, origin, BOX.damage, '0123456789.')),
-          gold: parseNumber(await readBox(image, size, origin, BOX.gold, '0123456789.')),
         })
       }
     } else {
@@ -534,9 +522,6 @@ export async function readScoreboard(imageData: Buffer, players: ScoreboardPlaye
             nick: await readBox(image, size, origin, HISTORY.nick, LETTERS),
             champion: await matchIcon(image, size, origin.x + icon.dx * scale, origin.y + icon.dy * scale, icon.r * scale).catch(() => null),
             kda: await readSpacedKda(image, size, origin, HISTORY.kda),
-            cs: parseNumber(await readBox(image, size, origin, HISTORY.cs, '0123456789')),
-            damage: null,
-            gold: parseNumber(await readBox(image, size, origin, HISTORY.gold, '0123456789.')),
           })
         }
       }
@@ -555,18 +540,14 @@ export async function readScoreboard(imageData: Buffer, players: ScoreboardPlaye
       row.kills = line.kda?.[0] ?? null
       row.deaths = line.kda?.[1] ?? null
       row.assists = line.kda?.[2] ?? null
-      row.cs = line.cs
-      row.damage = line.damage
-      row.gold = line.gold
     })
     const filled = rows.filter((r) => r.champion && r.kills !== null).length
-    const missing = layout === 'end' ? 'O farm (CS) não aparece nessa tela.' : 'O dano não aparece nessa tela.'
     return {
       read: filled > 0,
       note:
         filled === players.length
-          ? `Confira os números lidos do print antes de confirmar. ${missing}`
-          : `Li ${filled} de ${players.length} jogadores. Confira e complete o que faltou. ${missing}`,
+          ? `Confira o campeão e o KDA lidos do print (${layout === 'end' ? 'tela de fim de partida' : 'histórico'}) antes de confirmar.`
+          : `Li ${filled} de ${players.length} jogadores. Confira e complete o que faltou.`,
       rows,
     }
   } catch (err) {

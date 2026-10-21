@@ -24,12 +24,9 @@ interface Row {
   kills: string
   deaths: string
   assists: string
-  cs: string
-  gold: string
-  damage: string
 }
 
-const NUMBER_FIELDS = ['kills', 'deaths', 'assists', 'cs', 'gold', 'damage'] as const
+const NUMBER_FIELDS = ['kills', 'deaths', 'assists'] as const
 const REQUIRED_FIELDS = ['kills', 'deaths', 'assists'] as const
 
 const normalize = (text: string) =>
@@ -41,8 +38,8 @@ const normalize = (text: string) =>
 
 const cell = 'h-8 w-full rounded border border-rim bg-void px-1.5 text-center font-cond text-base tabular-nums text-gold-50 outline-none focus:border-gold-200'
 
-// Passo do print do placar (5x5): o capitão do time vencedor envia o print do fim da partida, confere os números
-// lidos (corrige ou preenche o que faltar) e confirma. Ele também pode pular. Os outros só aguardam.
+// Passo do print da pancada (5x5): o capitão do time vencedor envia o print do placar, confere o campeão e o KDA lidos
+// (corrige ou preenche o que faltar) e confirma. Ele também pode pular. Os outros só aguardam.
 export default function LobbyStats({ lobby, busy, onSubmit, onSkip }: Props) {
   const uploader = lobby.players.find((p) => p.id === lobby.match.statsUploaderId)
   const isUploader = Boolean(uploader?.isYou)
@@ -104,9 +101,6 @@ function UploaderView({ lobby, busy, onSubmit, onSkip }: Props) {
               kills: text(r?.kills),
               deaths: text(r?.deaths),
               assists: text(r?.assists),
-              cs: text(r?.cs),
-              gold: text(r?.gold),
-              damage: text(r?.damage),
             }
           }),
         )
@@ -148,7 +142,6 @@ function UploaderView({ lobby, busy, onSubmit, onSkip }: Props) {
       setShowErrors(true)
       return
     }
-    const num = (v: string) => (v === '' ? null : Number(v))
     onSubmit(
       rows.map((r) => ({
         userId: r.userId,
@@ -156,9 +149,9 @@ function UploaderView({ lobby, busy, onSubmit, onSkip }: Props) {
         kills: Number(r.kills),
         deaths: Number(r.deaths),
         assists: Number(r.assists),
-        cs: num(r.cs),
-        gold: num(r.gold),
-        damage: num(r.damage),
+        cs: null,
+        gold: null,
+        damage: null,
       })),
     )
   }
@@ -172,8 +165,8 @@ function UploaderView({ lobby, busy, onSubmit, onSkip }: Props) {
   return (
     <div className="space-y-5">
       <SectionTitle title="Print da pancada">
-        Você é o capitão vencedor: envie o print do placar da partida (com os 10 jogadores). O site lê campeão, KDA,
-        ouro e dano ou farm de cada um, e você confere antes de salvar.
+        Você é o capitão vencedor: envie o print do placar da partida (com os 10 jogadores). O site lê o campeão e o
+        KDA de cada um, e você confere antes de salvar.
       </SectionTitle>
 
       {!draft && (
@@ -304,7 +297,7 @@ function UploaderView({ lobby, busy, onSubmit, onSkip }: Props) {
         onCancel={() => setConfirmSkip(false)}
       >
         <p className="text-sm text-ash">
-          A partida fica sem os números (campeões, KDA, farm, ouro e dano), que não entram nas estatísticas de ninguém.
+          A partida fica sem o campeão e o KDA de cada um, que não entram nas estatísticas de ninguém.
         </p>
       </ConfirmDialog>
     </div>
@@ -332,7 +325,7 @@ function TeamTable({
 }) {
   const style = sideStyle[side]
   return (
-    <table className="w-full min-w-[40rem] border-separate border-spacing-y-1 text-sm">
+    <table className="w-full min-w-[28rem] border-separate border-spacing-y-1 text-sm">
       <thead>
         <tr className="text-left text-xs text-ash">
           <th className={`pb-1 font-display text-sm ${style.text}`}>{style.name}</th>
@@ -340,9 +333,6 @@ function TeamTable({
           <th className="w-12 pb-1 text-center font-semibold">A</th>
           <th className="w-12 pb-1 text-center font-semibold">M</th>
           <th className="w-12 pb-1 text-center font-semibold">As</th>
-          <th className="w-14 pb-1 text-center font-semibold">CS</th>
-          <th className="w-20 pb-1 text-center font-semibold">Ouro</th>
-          <th className="w-20 pb-1 text-center font-semibold">Dano</th>
         </tr>
       </thead>
       <tbody>
@@ -380,7 +370,7 @@ function TeamTable({
                   <input
                     inputMode="numeric"
                     value={row[f]}
-                    onChange={(e) => onChange(m.id, { [f]: e.target.value.replace(/\D/g, '').slice(0, 7) })}
+                    onChange={(e) => onChange(m.id, { [f]: e.target.value.replace(/\D/g, '').slice(0, 2) })}
                     aria-label={`${f} de ${splitRiotId(m.riotId)[0]}`}
                     className={`${cell} ${bad(row[f], (REQUIRED_FIELDS as readonly string[]).includes(f)) ? 'border-team-red' : ''}`}
                   />

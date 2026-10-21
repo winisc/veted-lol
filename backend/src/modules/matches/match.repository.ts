@@ -295,8 +295,7 @@ export const matchRepository = {
          JOIN match_players mp ON mp.match_id = s.match_id AND mp.user_id = s.user_id`
     const totals = db
       .prepare(
-        `SELECT COUNT(*) AS games, SUM(s.kills) AS kills, SUM(s.deaths) AS deaths, SUM(s.assists) AS assists,
-                AVG(s.cs) AS cs, AVG(s.gold) AS gold, AVG(s.damage) AS damage
+        `SELECT COUNT(*) AS games, SUM(s.kills) AS kills, SUM(s.deaths) AS deaths, SUM(s.assists) AS assists
          ${from} WHERE ${where}`,
       )
       .get(...params) as {
@@ -304,9 +303,6 @@ export const matchRepository = {
       kills: number | null
       deaths: number | null
       assists: number | null
-      cs: number | null
-      gold: number | null
-      damage: number | null
     }
     const champions = db
       .prepare(

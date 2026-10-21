@@ -114,7 +114,7 @@ export default function MatchDetail() {
                       }
                       right={
                         <span className="flex items-center gap-3">
-                        {p.stats && <ChampionKda stats={p.stats} detail />}
+                        {p.stats && <ChampionKda stats={p.stats} />}
                         <span className="flex flex-col items-end text-xs leading-tight text-ash">
                           {p.isCaptain ? (
                             <span>Capitão</span>

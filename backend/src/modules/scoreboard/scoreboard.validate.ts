@@ -13,8 +13,8 @@ function int(value: unknown, field: string, max: number, required: boolean): num
   return n
 }
 
-// Confere os dados enviados pelo capitão: uma linha para cada jogador da partida, com campeão e KDA
-// obrigatórios (CS, ouro e dano podem ficar em branco).
+// Confere os dados enviados pelo capitão: uma linha para cada jogador da partida, com campeão e KDA.
+// (CS, ouro e dano não são mais guardados; as colunas continuam no banco, vazias.)
 export function validateStats(body: unknown, playerIds: number[]): PlayerGameStats[] {
   const rows = (body as { rows?: unknown })?.rows
   if (!Array.isArray(rows)) throw new AppError('Dados da partida inválidos.', 400)
@@ -31,9 +31,9 @@ export function validateStats(body: unknown, playerIds: number[]): PlayerGameSta
       kills: int(row.kills, 'os abates', 99, true)!,
       deaths: int(row.deaths, 'as mortes', 99, true)!,
       assists: int(row.assists, 'as assistências', 99, true)!,
-      cs: int(row.cs, 'o farm', 2000, false),
-      gold: int(row.gold, 'o ouro', 200_000, false),
-      damage: int(row.damage, 'o dano', 1_000_000, false),
+      cs: null,
+      gold: null,
+      damage: null,
     }
   })
   if (new Set(result.map((r) => r.champion)).size !== result.length) {

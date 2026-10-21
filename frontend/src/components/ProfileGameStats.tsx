@@ -1,7 +1,6 @@
 import { formatPercent } from '../lib/format'
 import { useChampions } from '../lib/champions'
 import Panel from './ui/Panel'
-import { compactNumber } from './ui/ChampionKda'
 
 export interface ProfileGameStatsData {
   games: number
@@ -9,9 +8,6 @@ export interface ProfileGameStatsData {
   deaths: number
   assists: number
   kda: number
-  cs: number | null
-  gold: number | null
-  damage: number | null
   champions: { champion: string; games: number; wins: number; winRate: number | null; kda: number }[]
 }
 
@@ -26,7 +22,7 @@ function StatBox({ label, value, tone = 'text-gold-50' }: { label: string; value
 
 const decimal = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
 
-// Números das partidas com print do placar (na season): médias e os campeões mais jogados.
+// Partidas com print da pancada (na season): KDA médio e os campeões mais jogados.
 export default function ProfileGameStats({ data, seasonId }: { data: ProfileGameStatsData; seasonId?: number }) {
   const { nameOf, iconOf } = useChampions()
   return (
@@ -35,11 +31,9 @@ export default function ProfileGameStats({ data, seasonId }: { data: ProfileGame
       action={<span className="text-xs text-ash">{data.games} partida{data.games === 1 ? '' : 's'} com print da pancada</span>}
       bodyClassName="p-3 space-y-3"
     >
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2">
         <StatBox label="KDA médio" value={decimal(data.kda)} tone="text-gold-200" />
         <StatBox label="Por partida (A/M/As)" value={`${decimal(data.kills)}/${decimal(data.deaths)}/${decimal(data.assists)}`} />
-        <StatBox label="Dano médio" value={data.damage === null ? '–' : compactNumber(data.damage)} />
-        <StatBox label="Farm médio" value={data.cs === null ? '–' : `${data.cs} CS`} />
       </div>
 
       {data.champions.length > 0 && (

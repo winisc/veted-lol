@@ -20,16 +20,12 @@ function gameStats(userId: number, seasonId: number) {
   const { totals, champions } = matchRepository.gameStatsForUser(userId, seasonId)
   if (!totals.games) return null
   const per = (total: number | null) => Math.round(((total ?? 0) / totals.games) * 10) / 10
-  const round = (value: number | null) => (value === null ? null : Math.round(value))
   return {
     games: totals.games,
     kills: per(totals.kills),
     deaths: per(totals.deaths),
     assists: per(totals.assists),
     kda: kda(totals.kills ?? 0, totals.deaths ?? 0, totals.assists ?? 0),
-    cs: round(totals.cs),
-    gold: round(totals.gold),
-    damage: round(totals.damage),
     champions: champions.map((c) => ({
       champion: c.champion,
       games: c.games,
