@@ -112,6 +112,7 @@ export interface AdminMatch {
   mvpId: number | null
   bagreId: number | null
   votes: MatchVote[]
+  hasStats: boolean // tem o print da pancada (campeão e KDA de cada um)
   players: {
     userId: number
     riotId: string

@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs'
 import { AppError } from '../../shared/errors/AppError'
 import { formatRiotId } from '../../shared/utils/riotId'
 import { banService } from '../bans/ban.service'
+import { readScoreboard } from '../scoreboard/scoreboard.reader'
+import { validateStats } from '../scoreboard/scoreboard.validate'
 import { lobbyService } from '../lobby/lobby.service'
 import { matchRepository } from '../matches/match.repository'
 import { computePoints, winRate } from '../matches/match.scoring'
@@ -66,6 +68,21 @@ export const adminService = {
   updateMatch(matchId: string, outcome: unknown) {
     if (outcome !== 'blue' && outcome !== 'red' && outcome !== 'remake') throw new AppError('Resultado inválido.', 400)
     if (!matchRepository.updateOutcome(matchId, outcome)) throw new AppError('Partida não encontrada.', 404)
+  },
+
+  // Print da pancada de uma partida já salva (que ficou sem): lê o print e devolve para o admin conferir.
+  async readMatchScreenshot(matchId: string, image: Buffer) {
+    const players = matchRepository.playersOf(matchId)
+    if (players.length === 0) throw new AppError('Partida não encontrada.', 404)
+    if (!image?.length) throw new AppError('Envie a imagem do placar (PNG ou JPG).', 400)
+    return readScoreboard(image, players)
+  },
+
+  // Grava o campeão e o KDA conferidos pelo admin (substitui o que houver).
+  setMatchStats(matchId: string, body: unknown) {
+    const players = matchRepository.playersOf(matchId)
+    if (players.length === 0) throw new AppError('Partida não encontrada.', 404)
+    matchRepository.replaceStats(matchId, validateStats(body, players.map((p) => p.userId)))
   },
 
   deleteMatch(matchId: string) {

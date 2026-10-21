@@ -4,7 +4,7 @@ import { formatRiotId } from '../../shared/utils/riotId'
 import { boardSql, type Board } from '../../shared/types/modes'
 import { LEGACY_SEASON_ID } from '../seasons/season.constants'
 import type { PlayerGameStats } from '../scoreboard/scoreboard.types'
-import type { AdminMatch, AdminMatchPlayerRow, MatchDetail, MatchVote, PlayerResult, Rival, HistoryRow, MatchOutcome, NewMatch, PlayerStats, RankingRow } from './match.types'
+import type { AdminMatch, AdminMatchPlayerRow, MatchDetail, MatchVote, PlayerResult, Rival, HistoryRow, MatchOutcome, NewMatch, PlayerStats, RankingRow, Side } from './match.types'
 
 const insertMatch = db.prepare(
   'INSERT INTO matches (id, mode, season_id, started_at, ended_at, duration_seconds, outcome, mvp_user_id, bagre_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -322,10 +322,11 @@ export const matchRepository = {
     const matches = db
       .prepare(
         `SELECT id, mode, started_at AS startedAt, ended_at AS endedAt, duration_seconds AS durationSeconds,
-                outcome, mvp_user_id AS mvpId, bagre_user_id AS bagreId
+                outcome, mvp_user_id AS mvpId, bagre_user_id AS bagreId,
+                EXISTS (SELECT 1 FROM match_player_stats s WHERE s.match_id = matches.id) AS hasStats
          FROM matches ORDER BY ended_at DESC LIMIT ?`,
       )
-      .all(limit) as Omit<AdminMatch, 'players' | 'votes'>[]
+      .all(limit) as (Omit<AdminMatch, 'players' | 'votes' | 'hasStats'> & { hasStats: number })[]
     const votesOf = db.prepare(
       'SELECT kind, voter_id AS voterId, target_id AS targetId FROM match_votes WHERE match_id = ? ORDER BY kind, voter_id',
     )
@@ -337,6 +338,7 @@ export const matchRepository = {
     )
     return matches.map((m) => ({
       ...m,
+      hasStats: m.hasStats === 1,
       votes: votesOf.all(m.id) as MatchVote[],
       players: (playersOf.all(m.id) as AdminMatchPlayerRow[]).map((p) => ({
         userId: p.userId,
@@ -382,6 +384,25 @@ export const matchRepository = {
       return true
     })
     return update()
+  },
+
+  // Jogadores de uma partida salva (para ler o print dela): id, Riot ID e lado.
+  playersOf(matchId: string): { userId: number; riotId: string; side: Side }[] {
+    const rows = db
+      .prepare(
+        `SELECT mp.user_id AS userId, u.game_name AS gameName, u.tag_line AS tagLine, mp.side AS side
+         FROM match_players mp LEFT JOIN users u ON u.id = mp.user_id WHERE mp.match_id = ?`,
+      )
+      .all(matchId) as { userId: number; gameName: string | null; tagLine: string | null; side: Side }[]
+    return rows.map((r) => ({ userId: r.userId, riotId: formatRiotId(r.gameName ?? '?', r.tagLine ?? '?'), side: r.side }))
+  },
+
+  // Troca o campeão e o KDA de cada jogador de uma partida salva (admin: print adicionado depois).
+  replaceStats(matchId: string, stats: PlayerGameStats[]) {
+    db.transaction(() => {
+      db.prepare('DELETE FROM match_player_stats WHERE match_id = ?').run(matchId)
+      for (const s of stats) insertStats.run(matchId, s.userId, s.champion, s.kills, s.deaths, s.assists, s.cs, s.gold, s.damage)
+    })()
   },
 
   delete(matchId: string): boolean {

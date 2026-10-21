@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import express, { Router } from 'express'
 import { requireAuth } from '../../shared/middlewares/auth.middleware'
 import { adminController } from './admin.controller'
 import { requireAdmin } from './admin.middleware'
@@ -18,6 +18,13 @@ adminRoutes.post('/lobbies/:id/result', adminController.forceResult)
 adminRoutes.get('/matches', adminController.matches)
 adminRoutes.patch('/matches/:id', adminController.updateMatch)
 adminRoutes.delete('/matches/:id', adminController.deleteMatch)
+// Print da pancada em partida já salva: ler o print (imagem crua no corpo) e gravar o que foi conferido
+adminRoutes.post(
+  '/matches/:id/stats/screenshot',
+  express.raw({ type: ['image/png', 'image/jpeg', 'image/webp'], limit: '10mb' }),
+  adminController.matchScreenshot,
+)
+adminRoutes.post('/matches/:id/stats', adminController.matchStats)
 
 // Jogadores
 adminRoutes.get('/users', adminController.users)

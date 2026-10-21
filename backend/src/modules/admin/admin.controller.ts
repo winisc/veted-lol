@@ -38,6 +38,16 @@ export const adminController = {
     res.json({ ok: true })
   },
 
+  async matchScreenshot(req: AuthRequest, res: Response) {
+    const image = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0)
+    res.json({ draft: await adminService.readMatchScreenshot(idParam(req), image) })
+  },
+
+  matchStats(req: AuthRequest, res: Response) {
+    adminService.setMatchStats(idParam(req), req.body)
+    res.json({ ok: true })
+  },
+
   deleteMatch(req: AuthRequest, res: Response) {
     adminService.deleteMatch(idParam(req))
     res.json({ ok: true })

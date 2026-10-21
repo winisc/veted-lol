@@ -6,6 +6,8 @@ import { api } from '../../lib/api'
 import { queueModes, type QueueMode } from '../../lib/modes'
 import { formatDateTime } from '../../lib/format'
 import { formatDuration, sideStyle, splitRiotId } from '../../lib/teams'
+import type { PlayerGameStats } from '../../hooks/useLobby'
+import StatsUploader from '../StatsUploader'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import HexButton from '../ui/HexButton'
 import { CrownIcon, FishIcon, StarIcon } from '../ui/icons'
@@ -22,6 +24,7 @@ interface AdminMatch {
   mvpId: number | null
   bagreId: number | null
   votes?: { kind: 'mvp' | 'bagre'; voterId: number; targetId: number }[] // auditoria (só admin)
+  hasStats?: boolean // tem o print da pancada (ausente em servidores antigos)
   players: { userId: number; riotId: string; iconId: number; side: Side; isCaptain: boolean }[]
 }
 
@@ -89,6 +92,7 @@ export default function AdminMatches() {
   const { data, error, loading, reload } = useApi<{ matches: AdminMatch[] }>('/admin/matches')
   const { busy, message, run, clear } = useAction()
   const [pending, setPending] = useState<Pending | null>(null)
+  const [statsFor, setStatsFor] = useState<string | null>(null) // partida com o envio do print aberto
   const close = () => setPending(null)
 
   async function act(action: () => Promise<unknown>, success: string) {
@@ -132,7 +136,13 @@ export default function AdminMatches() {
                       <FishIcon className="h-3.5 w-3.5" /> Bagre {splitRiotId(bagre.riotId)[0]}
                     </span>
                   )}
+                  {match.hasStats && <span className="rounded bg-hex-900 px-2 py-0.5 text-xs font-semibold text-hex-300">Com print</span>}
                   <div className="ml-auto flex gap-1.5">
+                    {match.outcome !== 'remake' && (
+                      <RowAction disabled={busy} onClick={() => setStatsFor(statsFor === match.id ? null : match.id)}>
+                        {match.hasStats ? 'Refazer print' : 'Adicionar print'}
+                      </RowAction>
+                    )}
                     <RowAction disabled={busy} onClick={() => setPending({ kind: 'edit', match })}>
                       Corrigir resultado
                     </RowAction>
@@ -165,6 +175,29 @@ export default function AdminMatches() {
                 </div>
 
                 <VoteAudit match={match} />
+
+                {/* Print da pancada adicionado depois: mesma leitura e conferência do lobby */}
+                {statsFor === match.id && (
+                  <div className="mt-3 border-t border-rim pt-3">
+                    <StatsUploader
+                      players={match.players.map((p) => ({ id: p.userId, riotId: p.riotId, side: p.side }))}
+                      uploadPath={`/admin/matches/${match.id}/stats/screenshot`}
+                      intro={
+                        <p className="text-sm text-ash">
+                          Envie o print do placar desta partida (tela de fim de partida ou detalhe no histórico, aba Placar).
+                          {match.hasStats && ' Os dados que ela já tem serão substituídos.'}
+                        </p>
+                      }
+                      submitLabel="Salvar na partida"
+                      busy={busy}
+                      onSubmit={async (rows: PlayerGameStats[]) => {
+                        const ok = await run(() => api(`/admin/matches/${match.id}/stats`, { body: { rows } }), 'Print da pancada salvo na partida.', reload)
+                        if (ok) setStatsFor(null)
+                      }}
+                      onCancel={() => setStatsFor(null)}
+                    />
+                  </div>
+                )}
               </li>
             )
           })}
