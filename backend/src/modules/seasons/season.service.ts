@@ -92,9 +92,30 @@ export const seasonService = {
   },
 }
 
+// O ARAM não tem MVP nem bagre. Partidas de ARAM jogadas antes disso são limpas (MVP, bagre e os votos), e a
+// tabela de ARAM congelada das seasons já encerradas é refeita sem esses pontos. Só faz algo se ainda houver o que limpar.
+function stripAramAwards() {
+  const aram = "SELECT id FROM matches WHERE mode LIKE 'aram%'"
+  const changed = db.transaction(() => {
+    const cleared =
+      db.prepare(`UPDATE matches SET mvp_user_id = NULL, bagre_user_id = NULL WHERE id IN (${aram}) AND (mvp_user_id IS NOT NULL OR bagre_user_id IS NOT NULL)`).run().changes +
+      db.prepare(`UPDATE match_players SET is_mvp = 0, is_bagre = 0 WHERE match_id IN (${aram}) AND (is_mvp = 1 OR is_bagre = 1)`).run().changes +
+      db.prepare(`DELETE FROM match_votes WHERE match_id IN (${aram})`).run().changes
+    return cleared
+  })()
+  if (!changed) return
+  const closed = db.prepare('SELECT id FROM seasons WHERE closed = 1').all() as { id: number }[]
+  for (const { id } of closed) {
+    seasonRepository.clearStandings(id, 'aram')
+    seasonRepository.saveStandings(id, buildRanking(matchRepository.rankingRows(id, 'aram'), id), 'aram')
+  }
+  console.log('ARAM sem MVP e bagre: partidas antigas limpas e tabelas de ARAM refeitas.')
+}
+
 // Confere a virada de season de tempos em tempos (e já na hora de ligar).
 export function startSeasonScheduler() {
   ensureSeasons()
+  stripAramAwards()
   setInterval(() => {
     try {
       ensureSeasons()

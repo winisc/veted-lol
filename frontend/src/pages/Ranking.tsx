@@ -289,7 +289,7 @@ export default function Ranking() {
             )}
           </div>
         )}
-        <ScoringRules scoring={scoring} className="mt-2" />
+        <ScoringRules scoring={scoring} className="mt-2" noAwards={board === "aram"} />
       </PageHero>
 
       {/* Tabela normal (filas 5x5 com draft) ou de ARAM (3x3, 4x4 e 5x5 juntos) */}
@@ -354,7 +354,7 @@ export default function Ranking() {
       ) : (
         <>
           <Podium top={ranking.slice(0, 3)} myId={user?.id} />
-          <AwardLeaders ranking={ranking} myId={user?.id} />
+          {board !== "aram" && <AwardLeaders ranking={ranking} myId={user?.id} />}
 
           <ul className="flex flex-wrap gap-2" aria-label="Legenda das zonas">
             {zoneOrder.map((zone) => (
@@ -378,8 +378,8 @@ export default function Ranking() {
                   <th className="px-3 py-3 text-right">V</th>
                   <th className="px-3 py-3 text-right">D</th>
                   <th className="px-3 py-3 text-right">Win rate</th>
-                  <th className="px-3 py-3 text-right">MVPs</th>
-                  <th className="px-3 py-3 text-right">Bagres</th>
+                  {board !== "aram" && <th className="px-3 py-3 text-right">MVPs</th>}
+                  {board !== "aram" && <th className="px-3 py-3 text-right">Bagres</th>}
                 </tr>
               </thead>
               <tbody>
@@ -391,7 +391,7 @@ export default function Ranking() {
                     <Fragment key={zone}>
                       <tr>
                         <td
-                          colSpan={COLUMNS}
+                          colSpan={board === "aram" ? COLUMNS - 2 : COLUMNS} // ARAM: sem as colunas de MVPs e bagres
                           className={`px-3 py-2 font-display text-base ${style.header}`}
                         >
                           {style.symbol} {style.label}
@@ -453,12 +453,16 @@ export default function Ranking() {
                             <td className="px-3 py-2.5 text-right font-cond text-base tabular-nums text-gold-50/80">
                               {formatPercent(entry.winRate)}
                             </td>
-                            <td className="px-3 py-2.5 text-right font-cond text-base tabular-nums text-gold-200">
-                              {entry.mvps}
-                            </td>
-                            <td className="px-3 py-2.5 text-right font-cond text-base tabular-nums text-bagre">
-                              {entry.bagres ?? 0}
-                            </td>
+                            {board !== "aram" && (
+                              <td className="px-3 py-2.5 text-right font-cond text-base tabular-nums text-gold-200">
+                                {entry.mvps}
+                              </td>
+                            )}
+                            {board !== "aram" && (
+                              <td className="px-3 py-2.5 text-right font-cond text-base tabular-nums text-bagre">
+                                {entry.bagres ?? 0}
+                              </td>
+                            )}
                           </tr>
                         );
                       })}

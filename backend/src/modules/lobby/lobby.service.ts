@@ -251,8 +251,8 @@ function startPlaying(lobby: Lobby) {
 
 function settleResult(lobby: Lobby, outcome: MatchOutcome) {
   lobby.outcome = outcome
-  // Remake não tem vencedor, MVP nem bagre.
-  if (outcome === 'remake') finishMatch(lobby)
+  // Remake não tem vencedor, MVP nem bagre. O ARAM também não tem MVP nem bagre: termina no resultado.
+  if (outcome === 'remake' || isAramMode(lobby.mode)) finishMatch(lobby)
   // 5x5: o capitão vencedor envia o print do placar antes do MVP (sem prazo; ele pode pular). ARAM não tem capitão.
   else if (statsUploaderId(lobby) !== null) setPhase(lobby, 'stats', null)
   else startMvp(lobby)

@@ -22,18 +22,21 @@ function Rule({ value, label, classes, icon }: { value: string; label: string; c
 }
 
 // Regras de pontuação da tabela, em fichas (uma por resultado).
-export default function ScoringRules({ scoring, className = '' }: { scoring: Scoring; className?: string }) {
+// `noAwards`: sem MVP e bagre (tabela de ARAM).
+export default function ScoringRules({ scoring, className = '', noAwards = false }: { scoring: Scoring; className?: string; noAwards?: boolean }) {
   return (
     <ul className={`flex flex-wrap gap-2 ${className}`} aria-label="Como os pontos são calculados">
       <Rule value={signed(scoring.win)} label="por vitória" classes="text-hex-300" />
       <Rule value={signed(scoring.loss)} label="por derrota" classes="text-team-red" />
-      <Rule
-        value={signed(scoring.mvp)}
-        label="bônus de MVP"
-        classes="text-gold-200"
-        icon={<StarIcon className="h-4 w-4" />}
-      />
-      {scoring.bagre !== undefined && (
+      {!noAwards && (
+        <Rule
+          value={signed(scoring.mvp)}
+          label="bônus de MVP"
+          classes="text-gold-200"
+          icon={<StarIcon className="h-4 w-4" />}
+        />
+      )}
+      {!noAwards && scoring.bagre !== undefined && (
         <Rule
           value={signed(scoring.bagre)}
           label="para o bagre"

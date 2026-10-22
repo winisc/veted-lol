@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { MatchOutcome, Side } from '../hooks/useLobby'
-import { queueModes, type QueueMode } from '../lib/modes'
+import { isAramMode, queueModes, type QueueMode } from '../lib/modes'
 import { formatDuration, sideStyle, splitRiotId } from '../lib/teams'
 import { Link } from 'react-router-dom'
 import { CrownIcon, FishIcon, StarIcon } from './ui/icons'
@@ -71,7 +71,7 @@ export default function MatchResultCard({ result, now }: { result: RecentResult;
           {remake ? 'Remake' : `Vitória do ${sideStyle[result.outcome as Side].name}`}
         </p>
 
-        {!remake && (
+        {!remake && !isAramMode(result.mode) && (
           <div className="mt-2 grid grid-cols-2 gap-2">
             {(
               [

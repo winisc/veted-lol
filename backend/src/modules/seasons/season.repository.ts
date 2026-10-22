@@ -66,6 +66,10 @@ export const seasonRepository = {
     return rows.map(toSeason)
   },
 
+  clearStandings(seasonId: number, board: Board) {
+    db.prepare(`DELETE FROM ${standingsTable(board)} WHERE season_id = ?`).run(seasonId)
+  },
+
   saveStandings(seasonId: number, entries: RankingEntry[], board: Board = 'normal') {
     const insert = db.prepare(
       `INSERT OR REPLACE INTO ${standingsTable(board)} (season_id, user_id, position, points, games, wins, losses, mvps, bagres)

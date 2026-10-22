@@ -311,7 +311,7 @@ export default function LobbyFinished({ lobby, skew, busy, onRequeue, onLeave }:
           </p>
         </div>
 
-        {!remake && (
+        {!remake && !isAramMode(lobby.mode) && (
           <div className="flex flex-wrap gap-3">
             <AwardCard
               player={mvp}
