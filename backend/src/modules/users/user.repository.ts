@@ -2,6 +2,7 @@ import db from '../../database/db'
 import { resolveIconId } from '../../shared/utils/icons'
 import { isRole, type PlayerRoles } from '../../shared/types/roles'
 import type { RiotId } from '../../shared/utils/riotId'
+import { foldRiotText } from '../../shared/utils/riotId'
 import type { User } from './user.types'
 
 interface UserRow {
@@ -58,11 +59,19 @@ function findById(id: number): User | null {
 export const userRepository = {
   findById,
 
+  // Primeiro a grafia exata (sem diferenciar maiúsculas); se não achar, sem diferenciar acentos também
+  // ("buda#torao" acha "buda#torão"). Se a comparação sem acento achar mais de uma conta, não escolhe nenhuma.
   findByRiotId({ gameName, tagLine }: RiotId): User | null {
     const row = db
       .prepare('SELECT * FROM users WHERE game_name = ? COLLATE NOCASE AND tag_line = ? COLLATE NOCASE')
       .get(gameName, tagLine) as UserRow | undefined
-    return row ? toUser(row) : null
+    if (row) return toUser(row)
+    const name = foldRiotText(gameName)
+    const tag = foldRiotText(tagLine)
+    const similar = (db.prepare('SELECT * FROM users').all() as UserRow[]).filter(
+      (u) => foldRiotText(u.game_name) === name && foldRiotText(u.tag_line) === tag,
+    )
+    return similar.length === 1 ? toUser(similar[0]) : null
   },
 
   listAll(): User[] {

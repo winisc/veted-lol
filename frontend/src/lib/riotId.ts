@@ -26,5 +26,5 @@ export function isValidRiotIdFormat(input: string) {
 
   const gameName = value.slice(0, index)
   const tagLine = value.slice(index + 1)
-  return gameName.length >= 3 && gameName.length <= 16 && /^[A-Za-z0-9]{3,5}$/.test(tagLine)
+  return gameName.length >= 3 && gameName.length <= 16 && /^[\p{L}\p{N}]{3,5}$/u.test(tagLine)
 }

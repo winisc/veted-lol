@@ -8,7 +8,7 @@ export interface RiotId {
 const INVISIBLE = /\p{Cf}/gu
 const ODD_SPACES = /[\p{Zs}\t]/gu
 
-// Riot ID: "Nome#TAG" — nome de 3 a 16 caracteres, tag de 3 a 5 alfanuméricos.
+// Riot ID: "Nome#TAG" — nome de 3 a 16 caracteres, tag de 3 a 5 letras ou números (a Riot aceita acento, ex.: "torão").
 export function parseRiotId(input: unknown): RiotId | null {
   if (typeof input !== 'string') return null
   const clean = input.replace(INVISIBLE, '').replace(ODD_SPACES, ' ').replace(/ {2,}/g, ' ')
@@ -19,9 +19,18 @@ export function parseRiotId(input: unknown): RiotId | null {
   const tagLine = clean.slice(index + 1).trim()
 
   if (gameName.length < 3 || gameName.length > 16) return null
-  if (!/^[A-Za-z0-9]{3,5}$/.test(tagLine)) return null
+  if (!/^[\p{L}\p{N}]{3,5}$/u.test(tagLine)) return null
 
   return { gameName, tagLine }
+}
+
+// Forma de comparar Riot IDs sem diferenciar maiúsculas nem acentos ("Buda#Torao" = "buda#torão").
+export function foldRiotText(text: string) {
+  return text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
 }
 
 export function formatRiotId(gameName: string, tagLine: string) {
