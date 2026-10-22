@@ -44,7 +44,7 @@ export const rankingService = {
     const banned = banService.bannedUserIds()
     for (const entry of ranking) if (banned.has(entry.userId)) entry.banned = true
     if (season.id === current.id) {
-      const streaks = matchRepository.streaks(board)
+      const streaks = matchRepository.streaks(current.id, board)
       for (const entry of ranking) entry.streak = streaks.get(entry.userId) ?? 0
     }
 

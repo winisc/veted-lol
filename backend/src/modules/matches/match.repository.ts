@@ -79,18 +79,18 @@ export const matchRepository = {
     return row
   },
 
-  // Sequência atual de cada jogador (todas as seasons, remakes não contam nem quebram): positivo = vitórias seguidas,
-  // negativo = derrotas seguidas. Quem não tem partidas fica fora do mapa.
-  streaks(board: Board = 'normal'): Map<number, number> {
+  // Sequência atual de cada jogador na season (remakes não contam nem quebram): positivo = vitórias seguidas,
+  // negativo = derrotas seguidas. Recomeça a cada season. Quem não tem partidas nela fica fora do mapa.
+  streaks(seasonId: number, board: Board = 'normal'): Map<number, number> {
     const rows = db
       .prepare(
         `SELECT mp.user_id AS userId, mp.result AS result
          FROM match_players mp
          JOIN matches m ON m.id = mp.match_id
-         WHERE mp.result != 'remake' AND ${boardSql(board)}
+         WHERE mp.result != 'remake' AND ${boardSql(board)} AND ${SEASON_FILTER_SQL}
          ORDER BY m.ended_at DESC`,
       )
-      .all() as { userId: number; result: 'win' | 'loss' }[]
+      .all(seasonId, seasonId) as { userId: number; result: 'win' | 'loss' }[]
     const streaks = new Map<number, number>()
     const closed = new Set<number>() // a sequência deste jogador já acabou (achou um resultado diferente)
     for (const { userId, result } of rows) {
