@@ -17,6 +17,8 @@ import type { DropReason, QueueSnapshot, ReadyCheck } from './queue.types'
 const requiredByMode = () => Object.fromEntries(QUEUE_MODES.map((mode) => [mode, queueSize(mode)])) as Record<QueueMode, number>
 // Prazo para aceitar a partida quando a fila fecha.
 const READY_CHECK_MS = (Number(process.env.READY_CHECK_SECONDS) || 15) * 1000
+// Tolerância depois do fim do prazo de aceitar (a tela mostra o prazo normal): cobre o atraso da internet.
+const READY_CHECK_GRACE_MS = (Number(process.env.READY_CHECK_GRACE_SECONDS) || 2) * 1000
 // Tamanho máximo da lista de espera de cada modo.
 const STANDBY_MAX = Number(process.env.QUEUE_STANDBY_SIZE) || 5
 // Tempo para o jogador reconectar (ex.: F5) antes de ser removido da fila.
@@ -39,7 +41,7 @@ function armReadyCheckTimer(check: ReadyCheck, delayMs: number) {
     check.id,
     setTimeout(() => {
       failReadyCheck(check, check.players.filter((p) => !check.accepted.has(p.userId)).map((p) => p.userId))
-    }, delayMs),
+    }, delayMs + READY_CHECK_GRACE_MS),
   )
 }
 

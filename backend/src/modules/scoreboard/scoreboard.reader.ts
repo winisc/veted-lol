@@ -3,6 +3,7 @@ import path from 'node:path'
 import sharp from 'sharp'
 import { createWorker, PSM, type Worker } from 'tesseract.js'
 import { dbPath } from '../../database/db'
+import { championList } from '../champions/champion.service'
 import type { StatsDraft, StatsDraftRow } from './scoreboard.types'
 
 // Leitura do print do placar, em dois layouts do cliente do LoL (aba "Placar"):
@@ -105,22 +106,6 @@ function otsu(data: Buffer) {
 }
 
 // ---- campeões (Data Dragon) ----
-
-let champions: Promise<{ id: string; name: string }[]> | null = null
-
-function championList() {
-  champions ??= (async () => {
-    const versions = (await (await fetch(`${DDRAGON}/api/versions.json`)).json()) as string[]
-    const data = (await (await fetch(`${DDRAGON}/cdn/${versions[0]}/data/en_US/champion.json`)).json()) as {
-      data: Record<string, { id: string; name: string }>
-    }
-    return Object.values(data.data).map((c) => ({ id: c.id, name: c.name }))
-  })().catch((err) => {
-    champions = null
-    throw err
-  })
-  return champions
-}
 
 function matchChampion(text: string, list: { id: string; name: string }[]): string | null {
   let best: { id: string; score: number } | null = null

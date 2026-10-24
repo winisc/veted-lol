@@ -45,11 +45,35 @@ interface LobbyPlayer {
 }
 interface LobbySnapshot {
   id: string
-  phase: 'teams' | 'voting' | 'captains' | 'coinflip' | 'order' | 'side' | 'picking' | 'done' | 'playing' | 'result' | 'mvp' | 'bagre' | 'finished' | 'rematch'
+  phase: 'teams' | 'voting' | 'captains' | 'coinflip' | 'order' | 'side' | 'picking' | 'done' | 'bans' | 'champs' | 'playing' | 'result' | 'stats' | 'mvp' | 'bagre' | 'finished' | 'rematch'
   players: LobbyPlayer[]
-  draft: { currentTurnId: number | null; pickIndex: number }
-  match: { mvpCandidates: number[]; bagreCandidates: number[]; gameNumber: number; rematchVotes: number; rematchAvailable: boolean }
+  draft: { currentTurnId: number | null; pickIndex: number; confirmedIds?: number[] }
+  champSelect: {
+    bans: { userId: number; champions: string[] | null; count: number }[]
+    banCount: number
+    picks: { userId: number; champion: string }[]
+    turn: number[]
+  } | null
+  match: {
+    mvpCandidates: number[]
+    bagreCandidates: number[]
+    gameNumber: number
+    rematchVotes: number
+    rematchAvailable: boolean
+    statsUploaderId?: number | null
+  }
 }
+
+// Campeões para os bots banirem e escolherem (lista oficial da Riot; se não carregar, alguns fixos).
+let CHAMPIONS = ['Ahri', 'Garen', 'Jinx', 'Thresh', 'LeeSin', 'Lux', 'Darius', 'Ezreal', 'Yasuo', 'Leona', 'Annie', 'Ashe', 'Malphite', 'Nami', 'Zed']
+fetch('https://ddragon.leagueoflegends.com/api/versions.json')
+  .then((r) => r.json())
+  .then((v: string[]) => fetch(`https://ddragon.leagueoflegends.com/cdn/${v[0]}/data/en_US/champion.json`))
+  .then((r) => r.json())
+  .then((d: { data: Record<string, { id: string }> }) => {
+    CHAMPIONS = Object.values(d.data).map((c) => c.id)
+  })
+  .catch(() => {})
 
 interface Bot {
   id: number
@@ -145,6 +169,23 @@ function onLobbyEvent(bot: Bot, lobby: LobbySnapshot | null) {
   } else if (lobby.phase === 'picking' && myTurn) {
     const pool = lobby.players.filter((p) => p.team === null)
     act(`pick${lobby.draft.pickIndex}`, '/lobby/pick', { playerId: random(pool).id }, ACTION_DELAY_RANGE_MS)
+  } else if (lobby.phase === 'done' && lobby.players.find((p) => p.id === bot.id)?.isCaptain) {
+    act('confirm', '/lobby/confirm', undefined, ACTION_DELAY_RANGE_MS)
+  } else if (lobby.phase === 'bans' && lobby.champSelect) {
+    // Bot capitão: um ban por vez até completar os do time.
+    const mine = lobby.champSelect.bans.find((b) => b.userId === bot.id)
+    if (mine && mine.count < lobby.champSelect.banCount) {
+      const free = CHAMPIONS.filter((c) => !(mine.champions ?? []).includes(c))
+      act(`ban${mine.count}`, '/lobby/ban', { champion: random(free) }, [800, 2000])
+    }
+  } else if (lobby.phase === 'champs' && lobby.champSelect?.turn.includes(bot.id)) {
+    const taken = new Set([...lobby.champSelect.bans.flatMap((b) => b.champions ?? []), ...lobby.champSelect.picks.map((p) => p.champion)])
+    if (!lobby.champSelect.picks.some((p) => p.userId === bot.id)) {
+      act('champ', '/lobby/champion', { champion: random(CHAMPIONS.filter((c) => !taken.has(c))) }, ACTION_DELAY_RANGE_MS)
+    }
+  } else if (lobby.phase === 'stats' && lobby.match.statsUploaderId === bot.id) {
+    // Bot capitão vencedor: pula o print da pancada.
+    act('stats', '/lobby/stats/skip', undefined, ACTION_DELAY_RANGE_MS)
   } else if (lobby.phase === 'playing') {
     // Cada bot declara o fim da partida depois de ~MATCH_SECONDS (varia um pouco entre eles).
     act('end', '/lobby/end', { vote: true }, [MATCH_SECONDS * 750, MATCH_SECONDS * 1250])

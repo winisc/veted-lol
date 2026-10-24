@@ -8,11 +8,19 @@ export const lobbyConfig = {
   sideMs: seconds('LOBBY_SIDE_SECONDS', 20),
   orderMs: seconds('LOBBY_ORDER_SECONDS', 20), // modo tabela: o 2º colocado escolhe pickar primeiro ou segundo
   pickMs: seconds('LOBBY_PICK_SECONDS', 30), // tempo para cada pick
-  doneMs: seconds('LOBBY_DONE_SECONDS', 5), // tela do draft finalizado, antes da partida começar
+  // Times formados: os capitães confirmam para ir aos bans. Sem confirmação, segue sozinho depois deste tempo.
+  doneMs: seconds('LOBBY_CONFIRM_SECONDS', Number(process.env.LOBBY_DONE_SECONDS) || 60),
+  banMs: seconds('LOBBY_BAN_SECONDS', 60), // bans: os dois capitães banem ao mesmo tempo (um ban por jogador do time)
+  champPickMs: seconds('LOBBY_CHAMP_SECONDS', 30), // tempo de cada vez na escolha de campeões (1-2-2-2-2-1)
   teamsMs: seconds('LOBBY_TEAMS_SECONDS', 10), // ARAM: tela dos times sorteados, antes da partida começar
   mvpMs: seconds('LOBBY_MVP_SECONDS', 30), // votação de MVP
   bagreMs: seconds('LOBBY_BAGRE_SECONDS', 30), // votação do bagre (o pior da partida)
   rematchMs: seconds('LOBBY_REMATCH_SECONDS', 5), // aviso de troca de lados antes da revanche
+
+  // Tolerância depois do fim do prazo: a tela mostra o tempo normal, mas o servidor só fecha a fase este tanto depois
+  // do zero. Cobre o atraso da internet (a atualização chega atrasada e o clique demora a chegar), para quem age
+  // nos últimos segundos não dar com a fase já encerrada.
+  actionGraceMs: seconds('LOBBY_GRACE_SECONDS', 2),
 
   captains: 2,
   // Picks consecutivos por vez, alternando entre os capitães (quem ganhou o sorteio começa).

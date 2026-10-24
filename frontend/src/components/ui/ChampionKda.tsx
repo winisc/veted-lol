@@ -13,3 +13,14 @@ export default function ChampionKda({ stats }: { stats: Pick<PlayerGameStats, 'c
     </span>
   )
 }
+
+// Só o campeão (escolhido na seleção de campeões), antes de ter o KDA.
+export function ChampionIcon({ champion }: { champion: string }) {
+  const { nameOf, iconOf } = useChampions()
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1.5" title={nameOf(champion)}>
+      <img src={iconOf(champion)} alt={nameOf(champion)} className="h-6 w-6 rounded" />
+      <span className="hidden text-xs text-ash sm:inline">{nameOf(champion)}</span>
+    </span>
+  )
+}

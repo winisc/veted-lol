@@ -19,6 +19,7 @@ import {
   statsUploaderId,
   votesNeeded,
 } from './lobby.snapshot'
+import { isChampionId, knownChampions, warmChampions } from '../champions/champion.service'
 import { readScoreboard } from '../scoreboard/scoreboard.reader'
 import type { StatsDraft } from '../scoreboard/scoreboard.types'
 import { validateStats } from '../scoreboard/scoreboard.validate'
@@ -94,6 +95,11 @@ function timeoutAction(lobby: Lobby): (() => void) | null {
     case 'picking':
       return () => autoPick(lobby)
     case 'done':
+      return () => startBans(lobby)
+    case 'bans':
+      return () => finishBans(lobby)
+    case 'champs':
+      return () => autoChamps(lobby)
     case 'teams':
       return () => startPlaying(lobby)
     case 'mvp':
@@ -113,7 +119,8 @@ function setPhase(lobby: Lobby, phase: LobbyPhase, durationMs: number | null, on
   lobby.phase = phase
   lobby.endsAt = durationMs === null ? null : Date.now() + durationMs
   lobby.durationMs = durationMs ?? 0
-  if (durationMs !== null && onTimeout) timers.set(lobby.id, setTimeout(onTimeout, durationMs))
+  // O prazo mostrado é `durationMs`; a fase só fecha depois da tolerância (ver lobbyConfig.actionGraceMs).
+  if (durationMs !== null && onTimeout) timers.set(lobby.id, setTimeout(onTimeout, durationMs + lobbyConfig.actionGraceMs))
   broadcast(lobby)
 }
 
@@ -204,13 +211,83 @@ function applyPick(lobby: Lobby, playerId: number, auto = false) {
     return
   }
 
-  if (lobby.pickIndex >= lobby.pickOrder.length) setPhase(lobby, 'done', lobbyConfig.doneMs, () => startPlaying(lobby))
+  // Draft completo: os capitães confirmam os times para ir aos bans (sem confirmação, segue sozinho no fim do prazo).
+  if (lobby.pickIndex >= lobby.pickOrder.length) {
+    lobby.draftConfirms = new Set()
+    setPhase(lobby, 'done', lobbyConfig.doneMs, () => startBans(lobby))
+  }
   else setPhase(lobby, 'picking', lobbyConfig.pickMs, () => autoPick(lobby))
 }
 
 // Capitão ausente: o tempo acabou, escolhe um jogador aleatório para o draft não travar.
 function autoPick(lobby: Lobby) {
   applyPick(lobby, randomItem(draftPool(lobby)).userId)
+}
+
+// ---- Seleção de campeões (5x5): bans ao mesmo tempo, depois picks alternados, como na escolha alternada do LoL ----
+
+// Vezes dos picks: azul 1, vermelho 2, azul 2, vermelho 2, azul 2, vermelho 1 (com 5 por time). Dentro de cada time,
+// a ordem do draft (capitão primeiro, depois quem foi escolhido antes).
+function champOrder(lobby: Lobby): number[][] {
+  const left = { blue: [...lobby.teams.blue], red: [...lobby.teams.red] }
+  const order: number[][] = []
+  let side: Side = 'blue'
+  let take = 1
+  while (left.blue.length || left.red.length) {
+    const group = left[side].splice(0, take)
+    if (group.length) order.push(group)
+    side = otherSide(side)
+    take = 2
+  }
+  return order
+}
+
+function startBans(lobby: Lobby) {
+  warmChampions()
+  lobby.champSelect = {
+    bans: new Map(),
+    banCount: Math.max(lobby.teams.blue.length, lobby.teams.red.length),
+    order: champOrder(lobby),
+    turn: 0,
+    picks: new Map(),
+  }
+  setPhase(lobby, 'bans', lobbyConfig.banMs, () => finishBans(lobby))
+}
+
+// Fim dos bans: os bans que faltaram ficam vazios; aparecem para todos e começam os picks.
+function finishBans(lobby: Lobby) {
+  lobby.champSelect!.hovers = new Map()
+  setPhase(lobby, 'champs', lobbyConfig.champPickMs, () => autoChamps(lobby))
+}
+
+// Campeões que ainda dá para escolher (nem banidos nem escolhidos).
+function takenChampions(lobby: Lobby) {
+  const select = lobby.champSelect!
+  return new Set([...[...select.bans.values()].flat(), ...select.picks.values()])
+}
+
+// Tempo da vez acabou: quem não escolheu recebe um campeão aleatório entre os livres.
+function autoChamps(lobby: Lobby) {
+  const select = lobby.champSelect!
+  const taken = takenChampions(lobby)
+  const free = (knownChampions() ?? []).map((c) => c.id).filter((id) => !taken.has(id))
+  for (const userId of select.order[select.turn] ?? []) {
+    if (select.picks.has(userId) || free.length === 0) continue
+    // Tinha pré-selecionado um campeão livre: fica com ele; senão, um aleatório.
+    const hovered = select.hovers?.get(userId)
+    const champion = hovered && free.includes(hovered) ? hovered : free[Math.floor(Math.random() * free.length)]
+    free.splice(free.indexOf(champion), 1)
+    select.picks.set(userId, champion)
+    select.hovers?.delete(userId)
+  }
+  nextChampTurn(lobby)
+}
+
+function nextChampTurn(lobby: Lobby) {
+  const select = lobby.champSelect!
+  select.turn++
+  if (select.turn >= select.order.length) startPlaying(lobby)
+  else setPhase(lobby, 'champs', lobbyConfig.champPickMs, () => autoChamps(lobby))
 }
 
 // ---- ARAM: times sorteados, equilibrados pela tabela de ARAM ----
@@ -427,7 +504,7 @@ export const lobbyService = {
       if (action && lobby.endsAt !== null) {
         const remaining = Math.max(lobby.endsAt - Date.now(), RESTORE_GRACE_MS)
         lobby.endsAt = Date.now() + remaining
-        timers.set(lobby.id, setTimeout(action, remaining))
+        timers.set(lobby.id, setTimeout(action, remaining + lobbyConfig.actionGraceMs))
       }
     }
     return saved.lobbies.length
@@ -497,6 +574,7 @@ export const lobbyService = {
       createdAt: Date.now(),
     }
     lobbyRepository.create(lobby)
+    warmChampions() // lista de campeões pronta para a seleção de campeões
     // Elo do LoL de quem ainda não foi buscado (a maioria já veio ao entrar na fila). Chegando, atualiza a tela de todos.
     void eloService.refresh(players.map((p) => p.userId)).then((changed) => {
       if (changed && lobbyRepository.findById(lobby.id)) broadcast(lobby)
@@ -541,7 +619,7 @@ export const lobbyService = {
     const lobby = requireLobby(userId)
     if (typeof reaction !== 'string' || !REACTIONS.has(reaction)) throw new AppError('Reação inválida.', 400)
     // Reações só durante o draft (no ARAM, na tela dos times sorteados).
-    if (lobby.phase !== 'picking' && lobby.phase !== 'done' && lobby.phase !== 'teams') {
+    if (!['picking', 'done', 'teams', 'bans', 'champs'].includes(lobby.phase)) {
       throw new AppError('Reações só durante o draft.', 409)
     }
     const now = Date.now()
@@ -621,6 +699,74 @@ export const lobbyService = {
     return snapshotFor(lobby, userId)
   },
 
+  // Capitão confirma os times formados. Com os dois capitães confirmados, começam os bans.
+  confirmTeams(userId: number): LobbySnapshot {
+    const lobby = requireLobby(userId)
+    if (lobby.phase !== 'done') throw new AppError('Não é o momento de confirmar os times.', 409)
+    if (!lobby.captains.includes(userId)) throw new AppError('Só os capitães confirmam os times.', 403)
+
+    lobby.draftConfirms ??= new Set()
+    lobby.draftConfirms.add(userId)
+    if (lobby.captains.every((id) => lobby.draftConfirms!.has(id))) startBans(lobby)
+    else broadcast(lobby)
+    return snapshotFor(lobby, userId)
+  },
+
+  // Ban da seleção de campeões: só os capitães, um campeão por vez, até um por jogador do time (sem trocar).
+  // Quando os dois capitães completam os bans, os picks começam na hora.
+  ban(userId: number, champion: unknown): LobbySnapshot {
+    const lobby = requireLobby(userId)
+    const select = lobby.champSelect
+    if (lobby.phase !== 'bans' || !select) throw new AppError('Não é o momento de banir.', 409)
+    if (!lobby.captains.includes(userId)) throw new AppError('Só os capitães banem.', 403)
+    const mine = select.bans.get(userId) ?? []
+    if (mine.length >= select.banCount) throw new AppError('Você já fez todos os bans do seu time.', 409)
+    if (!isChampionId(champion)) throw new AppError('Campeão inválido.', 400)
+    if (mine.includes(champion)) throw new AppError('Você já baniu esse campeão.', 409)
+
+    select.bans.set(userId, [...mine, champion])
+    select.hovers?.delete(userId)
+    if (lobby.captains.every((id) => (select.bans.get(id)?.length ?? 0) >= select.banCount)) finishBans(lobby)
+    else broadcast(lobby)
+    return snapshotFor(lobby, userId)
+  },
+
+  // Pré-seleção (clicou no campeão, mas ainda não confirmou): aparece para os outros como "selecionando".
+  // Nos bans, só o capitão (e só o próprio time vê); nos picks, quem ainda não escolheu. `null` tira a pré-seleção.
+  hoverChampion(userId: number, champion: unknown): LobbySnapshot {
+    const lobby = requireLobby(userId)
+    const select = lobby.champSelect
+    if ((lobby.phase !== 'bans' && lobby.phase !== 'champs') || !select) throw new AppError('Não é o momento de escolher campeão.', 409)
+    if (lobby.phase === 'bans' && !lobby.captains.includes(userId)) throw new AppError('Só os capitães banem.', 403)
+    if (lobby.phase === 'champs' && select.picks.has(userId)) throw new AppError('Você já escolheu seu campeão.', 409)
+    select.hovers ??= new Map()
+    if (champion === null) select.hovers.delete(userId)
+    else {
+      if (!isChampionId(champion)) throw new AppError('Campeão inválido.', 400)
+      select.hovers.set(userId, champion)
+    }
+    broadcast(lobby)
+    return snapshotFor(lobby, userId)
+  },
+
+  // Pick de campeão: só quem está na vez, uma vez, e só campeão livre (nem banido nem escolhido).
+  pickChampion(userId: number, champion: unknown): LobbySnapshot {
+    const lobby = requireLobby(userId)
+    const select = lobby.champSelect
+    if (lobby.phase !== 'champs' || !select) throw new AppError('Não é o momento de escolher campeão.', 409)
+    const turn = select.order[select.turn] ?? []
+    if (!turn.includes(userId)) throw new AppError('Não é a sua vez de escolher.', 403)
+    if (select.picks.has(userId)) throw new AppError('Você já escolheu seu campeão.', 409)
+    if (!isChampionId(champion)) throw new AppError('Campeão inválido.', 400)
+    if (takenChampions(lobby).has(champion)) throw new AppError('Esse campeão foi banido ou já foi escolhido.', 409)
+
+    select.picks.set(userId, champion)
+    select.hovers?.delete(userId)
+    if (turn.every((id) => select.picks.has(id))) nextChampTurn(lobby)
+    else broadcast(lobby)
+    return snapshotFor(lobby, userId)
+  },
+
   // Capitão vencedor envia o print do placar: devolve o que deu para ler, para ele conferir (nada é salvo ainda).
   async readStatsScreenshot(userId: number, image: Buffer): Promise<StatsDraft> {
     const lobby = requireStatsUploader(userId)
@@ -630,7 +776,13 @@ export const lobbyService = {
       riotId: p.riotId,
       side: lobby.teams.blue.includes(p.userId) ? ('blue' as const) : ('red' as const),
     }))
-    return readScoreboard(image, players)
+    const draft = await readScoreboard(image, players)
+    // O campeão de cada um já é conhecido pela seleção de campeões: vale mais que o lido do print.
+    for (const row of draft.rows) {
+      const picked = lobby.champSelect?.picks.get(row.userId)
+      if (picked) row.champion = picked
+    }
+    return draft
   },
 
   // Dados conferidos pelo capitão vencedor: guarda e segue para o MVP.

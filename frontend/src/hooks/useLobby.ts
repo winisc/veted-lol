@@ -3,6 +3,7 @@ import type { ShownReaction } from '../lib/reactions'
 import type { PlayerElo } from '../lib/elo'
 import type { PlayerRoles } from '../lib/roles'
 import { API_BASE, api, tokenStorage } from '../lib/api'
+import { nextSkew } from '../lib/clock'
 import type { QueueMode } from '../lib/modes'
 
 export type Side = 'blue' | 'red'
@@ -16,6 +17,8 @@ export type LobbyPhase =
   | 'side'
   | 'picking'
   | 'done'
+  | 'bans' // seleção de campeões: os dois capitães banem ao mesmo tempo
+  | 'champs' // seleção de campeões: picks alternados (1-2-2-2-2-1)
   | 'playing'
   | 'result'
   | 'stats' // capitão vencedor envia o print do placar e confere os números
@@ -57,6 +60,7 @@ export interface DraftSnapshot {
   pickIndex: number
   totalPicks: number
   picks: Pick[]
+  confirmedIds?: number[] // capitães que já confirmaram os times (fase "done"; ausente em servidores antigos)
 }
 
 export interface MatchSnapshot {
@@ -105,6 +109,17 @@ export interface StatsDraft {
   rows: { [K in keyof PlayerGameStats]: K extends 'userId' ? number : PlayerGameStats[K] | null }[]
 }
 
+// Seleção de campeões (5x5). Bans de cada capitão; durante os bans, os do capitão adversário vêm escondidos
+// (`champions: null`, só a contagem).
+export interface ChampSelectSnapshot {
+  bans: { userId: number; champions: string[] | null; count: number }[]
+  banCount: number // bans de cada capitão
+  hovers?: { userId: number; champion: string }[] // pré-seleções ainda não confirmadas
+  picks: { userId: number; champion: string }[]
+  turn: number[] // quem escolhe agora
+  order: number[][]
+}
+
 export interface LobbySnapshot {
   id: string
   mode: QueueMode
@@ -117,6 +132,7 @@ export interface LobbySnapshot {
   votedCount: number
   captains: number[]
   draft: DraftSnapshot
+  champSelect?: ChampSelectSnapshot | null // ausente em servidores antigos
   match: MatchSnapshot
 }
 
@@ -151,7 +167,7 @@ export function useLobby() {
     source.onmessage = (event) => {
       const data = JSON.parse(event.data) as LobbyEvent
       setConnected(true)
-      setState({ lobby: data.lobby, notice: data.notice, skew: data.lobby ? data.lobby.now - Date.now() : 0 })
+      setState((s) => ({ lobby: data.lobby, notice: data.notice, skew: data.lobby ? nextSkew(s.lobby ? s.skew : null, data.lobby.now) : 0 }))
       // Reação de alguém do lobby: fica alguns segundos na tela e some sozinha.
       const reaction = data.reaction
       if (reaction) {
@@ -169,7 +185,7 @@ export function useLobby() {
     setError('')
     try {
       const data = await api<{ lobby: LobbySnapshot }>(path, { body })
-      setState((s) => ({ ...s, lobby: data.lobby, skew: data.lobby.now - Date.now() }))
+      setState((s) => ({ ...s, lobby: data.lobby, skew: nextSkew(s.lobby ? s.skew : null, data.lobby.now) }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado.')
     } finally {
@@ -181,6 +197,17 @@ export function useLobby() {
   const chooseOrder = useCallback((first: boolean) => act('/lobby/order', { first }), [act])
   const chooseSide = useCallback((side: Side) => act('/lobby/side', { side }), [act])
   const pick = useCallback((playerId: number) => act('/lobby/pick', { playerId }), [act])
+  const confirmTeams = useCallback(() => act('/lobby/confirm', {}), [act])
+  const banChampion = useCallback((champion: string) => act('/lobby/ban', { champion }), [act])
+  const pickChampion = useCallback((champion: string) => act('/lobby/champion', { champion }), [act])
+  // Pré-seleção (clicou, ainda não confirmou): sem "carregando" nem mensagem de erro, só avisa os outros.
+  const hoverChampion = useCallback(async (champion: string | null) => {
+    try {
+      await api('/lobby/hover', { body: { champion } })
+    } catch {
+      // ignorado
+    }
+  }, [])
   const voteEnd = useCallback((value: boolean) => act('/lobby/end', { vote: value }), [act])
   const voteResult = useCallback((choice: MatchOutcome) => act('/lobby/result', { choice }), [act])
   const voteMvp = useCallback((targetId: number) => act('/lobby/mvp', { targetId }), [act])
@@ -222,6 +249,10 @@ export function useLobby() {
     chooseOrder,
     chooseSide,
     pick,
+    confirmTeams,
+    banChampion,
+    pickChampion,
+    hoverChampion,
     voteEnd,
     voteResult,
     voteMvp,

@@ -17,6 +17,14 @@ export function useLobbySounds(lobby: LobbySnapshot | null | undefined, skew: nu
       meId !== undefined &&
       ((lobby.phase === 'voting' && lobby.myVote === null) ||
         myTurn ||
+        (lobby.phase === 'done' &&
+          lobby.captains.includes(meId) &&
+          !(lobby.draft.confirmedIds ?? []).includes(meId)) ||
+        (lobby.phase === 'bans' &&
+          !!lobby.champSelect?.bans.some((b) => b.userId === meId && b.count < lobby.champSelect!.banCount)) ||
+        (lobby.phase === 'champs' &&
+          !!lobby.champSelect?.turn.includes(meId) &&
+          !lobby.champSelect.picks.some((p) => p.userId === meId)) ||
         (lobby.phase === 'mvp' && lobby.match.myMvpVote === null) ||
         (lobby.phase === 'bagre' && lobby.match.myBagreVote === null)),
   )

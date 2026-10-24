@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LobbyAramTeams from '../components/LobbyAramTeams'
 import LobbyAwardVote from '../components/LobbyAwardVote'
+import LobbyChampSelect from '../components/LobbyChampSelect'
 import LobbyStats from '../components/LobbyStats'
 import LobbyCaptains from '../components/LobbyCaptains'
 import LobbyCoinFlip from '../components/LobbyCoinFlip'
@@ -29,6 +30,7 @@ const stages: { label: string; phases: LobbyPhase[] }[] = [
   { label: 'Capitães', phases: ['voting', 'captains'] },
   { label: 'Sorteio', phases: ['coinflip', 'order', 'side'] },
   { label: 'Draft', phases: ['picking', 'done'] },
+  { label: 'Campeões', phases: ['bans', 'champs'] },
   { label: 'Partida', phases: ['playing'] },
   { label: 'Resultado', phases: ['result', 'stats', 'mvp', 'bagre'] },
   { label: 'Fim', phases: ['finished', 'rematch'] },
@@ -37,14 +39,14 @@ const stages: { label: string; phases: LobbyPhase[] }[] = [
 // ARAM: sem capitães nem draft, os times já vêm sorteados.
 const aramStages: { label: string; phases: LobbyPhase[] }[] = [
   { label: 'Times', phases: ['teams'] },
-  ...stages.slice(3),
+  ...stages.filter((s) => ['Partida', 'Resultado', 'Fim'].includes(s.label)),
 ]
 
 function StageBar({ phase, aram }: { phase: LobbyPhase; aram: boolean }) {
   const list = aram ? aramStages : stages
   const current = list.findIndex((s) => s.phases.includes(phase))
   return (
-    <ol className={`grid gap-1 ${aram ? 'grid-cols-4' : 'grid-cols-6'}`} aria-label="Etapas do lobby">
+    <ol className={`grid gap-1 ${aram ? 'grid-cols-4' : 'grid-cols-7'}`} aria-label="Etapas do lobby">
       {list.map((stage, i) => {
         const state = i < current ? 'done' : i === current ? 'current' : 'next'
         return (
@@ -83,6 +85,10 @@ export default function Lobby() {
     chooseOrder,
     chooseSide,
     pick,
+    confirmTeams,
+    banChampion,
+    pickChampion,
+    hoverChampion,
     voteEnd,
     voteResult,
     voteMvp,
@@ -178,9 +184,12 @@ export default function Lobby() {
             {lobby.phase === 'order' && <LobbyOrder lobby={lobby} skew={skew} busy={busy} onChoose={chooseOrder} />}
             {lobby.phase === 'side' && <LobbySide lobby={lobby} skew={skew} busy={busy} onChoose={chooseSide} />}
             {(lobby.phase === 'picking' || lobby.phase === 'done') && (
-              <LobbyDraft lobby={lobby} skew={skew} busy={busy} onPick={pick} />
+              <LobbyDraft lobby={lobby} skew={skew} busy={busy} onPick={pick} onConfirm={confirmTeams} />
             )}
-            {lobby.phase === 'playing' && <LobbyPlaying lobby={lobby} skew={skew} busy={busy} onVoteEnd={voteEnd} />}
+            {(lobby.phase === 'bans' || lobby.phase === 'champs') && lobby.champSelect && (
+            <LobbyChampSelect lobby={lobby} skew={skew} busy={busy} onBan={banChampion} onPick={pickChampion} onHover={hoverChampion} />
+          )}
+          {lobby.phase === 'playing' && <LobbyPlaying lobby={lobby} skew={skew} busy={busy} onVoteEnd={voteEnd} />}
             {lobby.phase === 'result' && <LobbyResult lobby={lobby} skew={skew} busy={busy} onVote={voteResult} />}
             {lobby.phase === 'stats' && (
             <LobbyStats lobby={lobby} busy={busy} onSubmit={submitStats} onSkip={skipStats} />
@@ -195,7 +204,7 @@ export default function Lobby() {
         </section>
 
         {/* Reações rápidas (só no draft): aparecem por cima do ícone de quem mandou e no canto da tela */}
-        {(lobby.phase === 'picking' || lobby.phase === 'done' || lobby.phase === 'teams') && (
+        {['picking', 'done', 'teams', 'bans', 'champs'].includes(lobby.phase) && (
           <div className="flex justify-center">
             <ReactionBar onReact={react} />
           </div>

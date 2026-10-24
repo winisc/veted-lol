@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { API_BASE, ApiError, api, tokenStorage } from '../lib/api'
+import { nextSkew } from '../lib/clock'
 import { askPermissionOnJoin } from '../lib/notify'
 import type { QueueMode } from '../lib/modes'
 
@@ -79,7 +80,7 @@ export function QueueProvider({ children }: { children: ReactNode }) {
 
   const receive = useCallback((data: QueueSnapshot) => {
     setSnapshot(data)
-    if (data.readyCheck) setSkew(data.readyCheck.now - Date.now())
+    if (data.readyCheck) setSkew((prev) => nextSkew(prev || null, data.readyCheck!.now))
     if (data.dropped?.length) setDropped(data.dropped)
     else if (data.notice) setNotice(data.notice) // com a lista de quem saiu, o aviso rápido já diz tudo
   }, [])

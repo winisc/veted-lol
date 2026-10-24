@@ -39,14 +39,16 @@ export const splitRiotId = (riotId: string) => {
 }
 
 // Capitão primeiro, depois os picks na ordem em que foram feitos.
-export function teamMembers(lobby: LobbySnapshot, side: Side): LobbyPlayer[] {
+export function teamMembers(lobby: LobbySnapshot, side: Side): (LobbyPlayer & { champion?: string })[] {
   const byId = (id: number | null) => lobby.players.find((p) => p.id === id)
   const captain = byId(lobby.draft.sides[side])
   const picked = lobby.draft.picks.filter((pk) => byId(pk.byId)?.team === side).map((pk) => byId(pk.playerId))
   const ordered = [captain, ...picked].filter((p): p is LobbyPlayer => Boolean(p))
   // Na ordem do draft (capitão e picks); quem entrou no time sem draft (ARAM, times sorteados) vem em seguida.
   const rest = lobby.players.filter((p) => p.team === side && !ordered.includes(p))
-  return [...ordered, ...rest]
+  // Campeão de cada um, depois da seleção de campeões.
+  const champion = (id: number) => lobby.champSelect?.picks.find((p) => p.userId === id)?.champion
+  return [...ordered, ...rest].map((p) => ({ ...p, champion: champion(p.id) }))
 }
 
 export function formatDuration(totalSeconds: number) {

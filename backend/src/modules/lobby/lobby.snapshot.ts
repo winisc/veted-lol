@@ -102,6 +102,23 @@ export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
     myVote: lobby.votes.get(userId) ?? null,
     votedCount: lobby.votes.size,
     captains: lobby.captains,
+    champSelect: lobby.champSelect
+      ? {
+          bans: lobby.captains.map((captainId) => {
+            const list = lobby.champSelect!.bans.get(captainId) ?? []
+            // Durante os bans, cada time só vê os bans do próprio capitão.
+            const visible = lobby.phase !== 'bans' || teamOf(lobby, captainId) === teamOf(lobby, userId)
+            return { userId: captainId, champions: visible ? list : null, count: list.length }
+          }),
+          banCount: lobby.champSelect.banCount,
+          hovers: [...(lobby.champSelect.hovers ?? [])]
+            .filter(([id]) => lobby.phase !== 'bans' || teamOf(lobby, id) === teamOf(lobby, userId))
+            .map(([id, champion]) => ({ userId: id, champion })),
+          picks: [...lobby.champSelect.picks].map(([id, champion]) => ({ userId: id, champion })),
+          turn: lobby.phase === 'champs' ? (lobby.champSelect.order[lobby.champSelect.turn] ?? []) : [],
+          order: lobby.champSelect.order,
+        }
+      : null,
     draft: {
       firstPickId: lobby.firstPickId,
       orderChooserId: lobby.orderChooserId ?? null,
@@ -113,6 +130,7 @@ export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
       pickIndex: lobby.pickIndex,
       totalPicks: lobby.pickOrder.length,
       picks: lobby.picks,
+      confirmedIds: [...(lobby.draftConfirms ?? [])],
     },
     match: {
       startedAt: lobby.startedAt,
