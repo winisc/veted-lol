@@ -19,6 +19,7 @@ export type LobbyPhase =
   | 'done'
   | 'bans' // seleção de campeões: os dois capitães banem ao mesmo tempo
   | 'champs' // seleção de campeões: picks alternados (1-2-2-2-2-1)
+  | 'finalize' // finalização: tempo extra para trocar campeão com alguém do time
   | 'playing'
   | 'result'
   | 'stats' // capitão vencedor envia o print do placar e confere os números
@@ -116,6 +117,7 @@ export interface ChampSelectSnapshot {
   banCount: number // bans de cada capitão
   hovers?: { userId: number; champion: string }[] // pré-seleções ainda não confirmadas
   picks: { userId: number; champion: string }[]
+  trades?: { from: number; to: number }[] // pedidos de troca de campeão do seu time (finalização)
   turn: number[] // quem escolhe agora
   order: number[][]
 }
@@ -200,6 +202,10 @@ export function useLobby() {
   const confirmTeams = useCallback(() => act('/lobby/confirm', {}), [act])
   const banChampion = useCallback((champion: string) => act('/lobby/ban', { champion }), [act])
   const pickChampion = useCallback((champion: string) => act('/lobby/champion', { champion }), [act])
+  // Finalização: troca de campeão com um colega de time.
+  const requestTrade = useCallback((targetId: number) => act('/lobby/trade', { targetId }), [act])
+  const answerTrade = useCallback((fromId: number, accept: boolean) => act('/lobby/trade/answer', { fromId, accept }), [act])
+  const cancelTrade = useCallback(() => act('/lobby/trade/cancel', {}), [act])
   // Pré-seleção (clicou, ainda não confirmou): sem "carregando" nem mensagem de erro, só avisa os outros.
   const hoverChampion = useCallback(async (champion: string | null) => {
     try {
@@ -253,6 +259,9 @@ export function useLobby() {
     banChampion,
     pickChampion,
     hoverChampion,
+    requestTrade,
+    answerTrade,
+    cancelTrade,
     voteEnd,
     voteResult,
     voteMvp,

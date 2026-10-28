@@ -100,6 +100,8 @@ function timeoutAction(lobby: Lobby): (() => void) | null {
       return () => finishBans(lobby)
     case 'champs':
       return () => autoChamps(lobby)
+    case 'finalize':
+      return () => startPlaying(lobby)
     case 'teams':
       return () => startPlaying(lobby)
     case 'mvp':
@@ -286,8 +288,27 @@ function autoChamps(lobby: Lobby) {
 function nextChampTurn(lobby: Lobby) {
   const select = lobby.champSelect!
   select.turn++
-  if (select.turn >= select.order.length) startPlaying(lobby)
+  if (select.turn >= select.order.length) startFinalize(lobby)
   else setPhase(lobby, 'champs', lobbyConfig.champPickMs, () => autoChamps(lobby))
+}
+
+// Finalização: todos já escolheram; um tempo extra para trocar campeão com alguém do time, depois a partida começa.
+function startFinalize(lobby: Lobby) {
+  const select = lobby.champSelect!
+  select.hovers = new Map()
+  select.trades = new Map()
+  setPhase(lobby, 'finalize', lobbyConfig.finalizeMs, () => startPlaying(lobby))
+}
+
+function sameTeam(lobby: Lobby, a: number, b: number) {
+  return (lobby.teams.blue.includes(a) && lobby.teams.blue.includes(b)) || (lobby.teams.red.includes(a) && lobby.teams.red.includes(b))
+}
+
+function requireFinalize(userId: number) {
+  const lobby = requireLobby(userId)
+  if (lobby.phase !== 'finalize' || !lobby.champSelect) throw new AppError('Não é o momento de trocar campeão.', 409)
+  lobby.champSelect.trades ??= new Map()
+  return { lobby, select: lobby.champSelect, trades: lobby.champSelect.trades }
 }
 
 // ---- ARAM: times sorteados, equilibrados pela tabela de ARAM ----
@@ -619,7 +640,7 @@ export const lobbyService = {
     const lobby = requireLobby(userId)
     if (typeof reaction !== 'string' || !REACTIONS.has(reaction)) throw new AppError('Reação inválida.', 400)
     // Reações só durante o draft (no ARAM, na tela dos times sorteados).
-    if (!['picking', 'done', 'teams', 'bans', 'champs'].includes(lobby.phase)) {
+    if (!['picking', 'done', 'teams', 'bans', 'champs', 'finalize'].includes(lobby.phase)) {
       throw new AppError('Reações só durante o draft.', 409)
     }
     const now = Date.now()
@@ -728,6 +749,42 @@ export const lobbyService = {
     select.hovers?.delete(userId)
     if (lobby.captains.every((id) => (select.bans.get(id)?.length ?? 0) >= select.banCount)) finishBans(lobby)
     else broadcast(lobby)
+    return snapshotFor(lobby, userId)
+  },
+
+  // Finalização: pede para trocar de campeão com um colega de time (substitui um pedido anterior).
+  requestTrade(userId: number, targetId: unknown): LobbySnapshot {
+    const { lobby, select, trades } = requireFinalize(userId)
+    if (typeof targetId !== 'number' || targetId === userId || !sameTeam(lobby, userId, targetId)) {
+      throw new AppError('Só dá para trocar com alguém do seu time.', 400)
+    }
+    if (!select.picks.has(userId) || !select.picks.has(targetId)) throw new AppError('Os dois precisam ter campeão para trocar.', 409)
+    trades.set(userId, targetId)
+    broadcast(lobby)
+    return snapshotFor(lobby, userId)
+  },
+
+  // Resposta a um pedido de troca: aceitar troca os campeões dos dois na hora.
+  answerTrade(userId: number, fromId: unknown, accept: unknown): LobbySnapshot {
+    const { lobby, select, trades } = requireFinalize(userId)
+    if (typeof fromId !== 'number' || trades.get(fromId) !== userId) throw new AppError('Esse pedido de troca não existe mais.', 409)
+    trades.delete(fromId)
+    if (accept === true) {
+      const mine = select.picks.get(userId)!
+      select.picks.set(userId, select.picks.get(fromId)!)
+      select.picks.set(fromId, mine)
+      // Pedidos que envolviam os dois ficam sem sentido (os campeões mudaram).
+      for (const [from, to] of [...trades]) if ([from, to].some((id) => id === userId || id === fromId)) trades.delete(from)
+    }
+    broadcast(lobby)
+    return snapshotFor(lobby, userId)
+  },
+
+  // Desiste do próprio pedido de troca.
+  cancelTrade(userId: number): LobbySnapshot {
+    const { lobby, trades } = requireFinalize(userId)
+    trades.delete(userId)
+    broadcast(lobby)
     return snapshotFor(lobby, userId)
   },
 

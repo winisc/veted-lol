@@ -20,6 +20,7 @@ export type LobbyPhase =
   | 'done'
   | 'bans' // seleção de campeões (5x5): os dois capitães banem ao mesmo tempo (5 cada); os do adversário aparecem no fim
   | 'champs' // seleção de campeões: picks alternados entre os times (1-2-2-2-2-1), na ordem do draft
+  | 'finalize' // finalização: tempo extra depois dos picks para trocar campeão com alguém do time
   | 'playing'
   | 'result'
   | 'stats' // capitão vencedor envia o print do placar e confere os números (5x5; pode pular)
@@ -93,6 +94,7 @@ export interface ChampSelect {
   turn: number // índice da vez atual em `order`
   picks: Map<number, string> // jogador -> campeão escolhido
   hovers?: Map<number, string> // pré-seleção (ainda não confirmada): jogador -> campeão
+  trades?: Map<number, number> // finalização: pedidos de troca de campeão (quem pediu -> com quem)
 }
 
 export interface ChampSelectSnapshot {
@@ -102,6 +104,7 @@ export interface ChampSelectSnapshot {
   // Pré-seleções ainda não confirmadas. Nos bans, só as do próprio capitão (para não entregar o ban).
   hovers: { userId: number; champion: string }[]
   picks: { userId: number; champion: string }[]
+  trades: { from: number; to: number }[] // pedidos de troca do seu time (finalização)
   turn: number[] // quem escolhe agora
   order: number[][]
 }

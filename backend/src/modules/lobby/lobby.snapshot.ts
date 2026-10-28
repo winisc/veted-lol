@@ -115,6 +115,10 @@ export function snapshotFor(lobby: Lobby, userId: number): LobbySnapshot {
             .filter(([id]) => lobby.phase !== 'bans' || teamOf(lobby, id) === teamOf(lobby, userId))
             .map(([id, champion]) => ({ userId: id, champion })),
           picks: [...lobby.champSelect.picks].map(([id, champion]) => ({ userId: id, champion })),
+          // Trocas são só entre colegas: cada time vê os pedidos do próprio time.
+          trades: [...(lobby.champSelect.trades ?? [])]
+            .filter(([from]) => teamOf(lobby, from) === teamOf(lobby, userId))
+            .map(([from, to]) => ({ from, to })),
           turn: lobby.phase === 'champs' ? (lobby.champSelect.order[lobby.champSelect.turn] ?? []) : [],
           order: lobby.champSelect.order,
         }

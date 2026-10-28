@@ -12,6 +12,7 @@ export const lobbyConfig = {
   doneMs: seconds('LOBBY_CONFIRM_SECONDS', Number(process.env.LOBBY_DONE_SECONDS) || 60),
   banMs: seconds('LOBBY_BAN_SECONDS', 60), // bans: os dois capitães banem ao mesmo tempo (um ban por jogador do time)
   champPickMs: seconds('LOBBY_CHAMP_SECONDS', 30), // tempo de cada vez na escolha de campeões (1-2-2-2-2-1)
+  finalizeMs: seconds('LOBBY_FINALIZE_SECONDS', 30), // finalização: depois do último pick, dá para trocar campeão com o time
   teamsMs: seconds('LOBBY_TEAMS_SECONDS', 10), // ARAM: tela dos times sorteados, antes da partida começar
   mvpMs: seconds('LOBBY_MVP_SECONDS', 30), // votação de MVP
   bagreMs: seconds('LOBBY_BAGRE_SECONDS', 30), // votação do bagre (o pior da partida)

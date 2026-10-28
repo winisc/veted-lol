@@ -35,6 +35,18 @@ export const lobbyController = {
     res.json({ lobby: lobbyService.ban(req.userId!, req.body?.champion) })
   },
 
+  trade(req: AuthRequest, res: Response) {
+    res.json({ lobby: lobbyService.requestTrade(req.userId!, req.body?.targetId) })
+  },
+
+  tradeAnswer(req: AuthRequest, res: Response) {
+    res.json({ lobby: lobbyService.answerTrade(req.userId!, req.body?.fromId, req.body?.accept) })
+  },
+
+  tradeCancel(req: AuthRequest, res: Response) {
+    res.json({ lobby: lobbyService.cancelTrade(req.userId!) })
+  },
+
   hover(req: AuthRequest, res: Response) {
     res.json({ lobby: lobbyService.hoverChampion(req.userId!, req.body?.champion ?? null) })
   },

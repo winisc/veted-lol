@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { LobbyPlayer, LobbySnapshot, Side } from '../hooks/useLobby'
+import { championLanes } from '../lib/championLanes'
 import { useChampions } from '../lib/champions'
+import { roleInfo, roleOrder, type Role } from '../lib/roles'
 import { sideStyle, splitRiotId, teamMembers } from '../lib/teams'
 import PhaseTimer from './PhaseTimer'
 import HexButton from './ui/HexButton'
@@ -13,6 +15,9 @@ interface Props {
   onBan: (champion: string) => void
   onPick: (champion: string) => void
   onHover: (champion: string | null) => void // pré-seleção: os outros veem como "selecionando"
+  onTrade: (targetId: number) => void // finalização: pedir troca de campeão com um colega
+  onTradeAnswer: (fromId: number, accept: boolean) => void
+  onTradeCancel: () => void
 }
 
 const normalize = (text: string) =>
@@ -27,19 +32,23 @@ const firstName = (riotId: string) => splitRiotId(riotId)[0]
 //  1. Bans: só os dois capitães banem, ao mesmo tempo, um campeão por jogador do time. Cada time vê os bans do
 //     próprio capitão; os do adversário aparecem quando os dois terminarem (ou o tempo acabar).
 //  2. Picks: em vezes alternadas (1-2-2-2-2-1), na ordem do draft. Campeão banido ou já escolhido fica bloqueado.
+//  3. Finalização: todos já escolheram; um tempo extra para trocar campeão com um colega (pede e o colega aceita).
 // Ao clicar num campeão ele fica pré-selecionado (os outros veem "selecionando"); só vale depois de confirmar.
-export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onHover }: Props) {
+export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onHover, onTrade, onTradeAnswer, onTradeCancel }: Props) {
   const select = lobby.champSelect!
   const { champions, nameOf, iconOf } = useChampions()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
+  const [lane, setLane] = useState<Role | null>(null) // filtro por rota, como no cliente do LoL
 
   const me = lobby.players.find((p) => p.isYou)
   const banning = lobby.phase === 'bans'
+  const finalizing = lobby.phase === 'finalize'
+  const incoming = me ? (select.trades ?? []).find((t) => t.to === me.id) : undefined
   const pickOf = (id: number) => select.picks.find((p) => p.userId === id)?.champion ?? null
   const myBans = me ? select.bans.find((b) => b.userId === me.id) : undefined // só existe se você é capitão
   const bansLeft = myBans ? select.banCount - myBans.count : 0
-  const myTurn = !banning && me ? select.turn.includes(me.id) && !pickOf(me.id) : false
+  const myTurn = !banning && !finalizing && me ? select.turn.includes(me.id) && !pickOf(me.id) : false
   const canAct = banning ? bansLeft > 0 : myTurn
 
   // Bloqueados: nos bans, os que você já baniu; nos picks, os banidos e os já escolhidos.
@@ -53,7 +62,9 @@ export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onH
     [banning, select, myBans],
   )
   const term = normalize(search.trim())
-  const list = champions.filter((c) => !term || normalize(c.name).includes(term))
+  const list = champions.filter(
+    (c) => (!term || normalize(c.name).includes(term)) && (!lane || (championLanes[c.id] ?? []).includes(lane)),
+  )
   const choice = selected && !taken.has(selected) ? selected : null
 
   function confirm() {
@@ -66,7 +77,11 @@ export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onH
   const nameById = (id: number) => firstName(lobby.players.find((p) => p.id === id)?.riotId ?? '')
 
   // Faixa de status: o que está acontecendo e, em destaque, quando é a sua vez.
-  const headline = canAct
+  const headline = finalizing
+    ? incoming
+      ? `${nameById(incoming.from)} quer trocar de campeão com você`
+      : 'Finalização'
+    : canAct
     ? banning
       ? 'Sua vez de banir'
       : 'Sua vez de escolher'
@@ -77,7 +92,9 @@ export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onH
       : select.turn.length
         ? `${select.turn.map(nameById).join(' e ')} ${select.turn.length > 1 ? 'escolhem' : 'escolhe'}`
         : 'Escolha de campeões'
-  const detail = banning
+  const detail = finalizing
+    ? 'Troque de campeão com alguém do seu time: clique em "Trocar" ao lado do colega. A partida começa quando o tempo acabar.'
+    : banning
     ? canAct
       ? `Faltam ${bansLeft} de ${select.banCount}. Os bans do adversário aparecem no fim.`
       : select.bans.map((b) => `${nameById(b.userId)} ${b.count}/${select.banCount}`).join(' · ')
@@ -97,7 +114,7 @@ export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onH
       >
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ash">
-            {banning ? 'Fase de bans' : 'Escolha de campeões'}
+            {banning ? 'Fase de bans' : finalizing ? 'Últimos ajustes' : 'Escolha de campeões'}
           </p>
           <p className={`flex items-center gap-2 font-display text-2xl leading-tight ${canAct ? 'text-gold-200' : 'text-gold-50'}`}>
             {canAct && (
@@ -115,13 +132,24 @@ export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onH
             endsAt={lobby.endsAt}
             durationMs={lobby.durationMs}
             skew={skew}
-            label={banning ? 'Bans que faltarem ficam vazios' : 'Sem confirmar: pré-seleção ou aleatório'}
+            label={banning ? 'Bans que faltarem ficam vazios' : finalizing ? 'A partida começa quando acabar' : 'Sem confirmar: pré-seleção ou aleatório'}
           />
         </div>
       </div>
 
       <div className="grid items-start gap-3 lg:grid-cols-[15.5rem_minmax(0,1fr)_15.5rem]">
-        <TeamColumn side="blue" members={teamMembers(lobby, 'blue')} lobby={lobby} pickOf={pickOf} iconOf={iconOf} nameOf={nameOf} />
+        <TeamColumn
+          side="blue"
+          members={teamMembers(lobby, 'blue')}
+          lobby={lobby}
+          pickOf={pickOf}
+          iconOf={iconOf}
+          nameOf={nameOf}
+          busy={busy}
+          onTrade={onTrade}
+          onTradeAnswer={onTradeAnswer}
+          onTradeCancel={onTradeCancel}
+        />
 
         {/* Campeões */}
         <div
@@ -159,8 +187,36 @@ export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onH
             </HexButton>
           </div>
 
+          {/* Filtro por rota (rotas oficiais do cliente do LoL) */}
+          <div className="mb-2.5 flex flex-wrap items-center gap-1" role="group" aria-label="Filtrar por rota">
+            <button
+              type="button"
+              onClick={() => setLane(null)}
+              aria-pressed={lane === null}
+              className={`h-8 rounded-md border px-3 text-xs font-semibold transition-colors ${
+                lane === null ? 'border-gold-200 bg-gold-200/15 text-gold-50' : 'border-rim text-ash hover:border-ash-dim hover:text-gold-50'
+              }`}
+            >
+              Todos
+            </button>
+            {roleOrder.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setLane(lane === r ? null : r)}
+                aria-pressed={lane === r}
+                title={roleInfo[r].name}
+                className={`grid h-8 w-9 place-items-center rounded-md border transition-colors ${
+                  lane === r ? 'border-gold-200 bg-gold-200/15' : 'border-rim hover:border-ash-dim'
+                }`}
+              >
+                <img src={roleInfo[r].icon} alt={roleInfo[r].name} className={`h-5 w-5 ${lane === r ? '' : 'opacity-60'}`} />
+              </button>
+            ))}
+          </div>
+
           <div className="relative">
-            <ul className="grid h-[26rem] grid-cols-[repeat(auto-fill,minmax(4.25rem,1fr))] content-start gap-x-1.5 gap-y-2 overflow-y-auto pb-6 pr-1">
+            <ul className="grid h-[23.5rem] grid-cols-[repeat(auto-fill,minmax(4.25rem,1fr))] content-start gap-x-1.5 gap-y-2 overflow-y-auto pb-6 pr-1">
               {list.map((c) => {
                 const blocked = taken.has(c.id)
                 const active = choice === c.id
@@ -215,7 +271,18 @@ export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onH
           </div>
         </div>
 
-        <TeamColumn side="red" members={teamMembers(lobby, 'red')} lobby={lobby} pickOf={pickOf} iconOf={iconOf} nameOf={nameOf} />
+        <TeamColumn
+          side="red"
+          members={teamMembers(lobby, 'red')}
+          lobby={lobby}
+          pickOf={pickOf}
+          iconOf={iconOf}
+          nameOf={nameOf}
+          busy={busy}
+          onTrade={onTrade}
+          onTradeAnswer={onTradeAnswer}
+          onTradeCancel={onTradeCancel}
+        />
       </div>
     </div>
   )
@@ -228,6 +295,10 @@ function TeamColumn({
   pickOf,
   iconOf,
   nameOf,
+  busy,
+  onTrade,
+  onTradeAnswer,
+  onTradeCancel,
 }: {
   side: Side
   members: LobbyPlayer[]
@@ -235,6 +306,10 @@ function TeamColumn({
   pickOf: (id: number) => string | null
   iconOf: (id: string) => string
   nameOf: (id: string) => string
+  busy: boolean
+  onTrade: (targetId: number) => void
+  onTradeAnswer: (fromId: number, accept: boolean) => void
+  onTradeCancel: () => void
 }) {
   const style = sideStyle[side]
   const select = lobby.champSelect!
@@ -246,6 +321,12 @@ function TeamColumn({
   // Ban que o capitão do seu time está pré-selecionando (só o próprio time vê): no próximo espaço vazio.
   const banHover = banning ? (select.hovers ?? []).find((h) => h.userId === captainBans?.userId)?.champion : undefined
   const hoverSlot = captainBans?.champions ? captainBans.champions.length : -1
+  // Finalização: trocas só no seu time.
+  const me = members.find((m) => m.isYou)
+  const finalizing = lobby.phase === 'finalize'
+  const trades = select.trades ?? []
+  const myRequest = me ? trades.find((t) => t.from === me.id) : undefined
+  const tradeButton = 'rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50'
 
   return (
     <div className="overflow-hidden rounded-xl border border-rim bg-abyss">
@@ -364,6 +445,37 @@ function TeamColumn({
                   </span>
                 )}
               </span>
+
+              {/* Finalização: trocar campeão com um colega (só no seu time) */}
+              {finalizing && me && m.id !== me.id && champion && (
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                  {trades.some((t) => t.from === m.id && t.to === me.id) ? (
+                    <>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gold-200">Quer trocar</span>
+                      <span className="flex gap-1">
+                        <button type="button" disabled={busy} onClick={() => onTradeAnswer(m.id, true)} className={`${tradeButton} border-hex-300/60 bg-hex-300/15 text-hex-300 hover:bg-hex-300/25`}>
+                          Aceitar
+                        </button>
+                        <button type="button" disabled={busy} onClick={() => onTradeAnswer(m.id, false)} className={`${tradeButton} border-rim text-ash hover:text-gold-50`}>
+                          Recusar
+                        </button>
+                      </span>
+                    </>
+                  ) : myRequest?.to === m.id ? (
+                    <button type="button" disabled={busy} onClick={onTradeCancel} className={`${tradeButton} border-gold-200/50 text-gold-200`} title="Cancelar o pedido">
+                      Aguardando · cancelar
+                    </button>
+                  ) : (
+                    <button type="button" disabled={busy || !pickOf(me.id)} onClick={() => onTrade(m.id)} className={`${tradeButton} border-rim text-gold-50 hover:border-gold-200/60`}>
+                      Trocar
+                    </button>
+                  )}
+                </span>
+              )}
+              {/* Pedido entre outros dois colegas: só um aviso */}
+              {finalizing && me && m.id !== me.id && trades.some((t) => t.from === m.id && t.to !== me.id) && (
+                <span className="shrink-0 text-[10px] text-ash">trocando...</span>
+              )}
             </li>
           )
         })}

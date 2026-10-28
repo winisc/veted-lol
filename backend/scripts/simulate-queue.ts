@@ -45,13 +45,14 @@ interface LobbyPlayer {
 }
 interface LobbySnapshot {
   id: string
-  phase: 'teams' | 'voting' | 'captains' | 'coinflip' | 'order' | 'side' | 'picking' | 'done' | 'bans' | 'champs' | 'playing' | 'result' | 'stats' | 'mvp' | 'bagre' | 'finished' | 'rematch'
+  phase: 'teams' | 'voting' | 'captains' | 'coinflip' | 'order' | 'side' | 'picking' | 'done' | 'bans' | 'champs' | 'finalize' | 'playing' | 'result' | 'stats' | 'mvp' | 'bagre' | 'finished' | 'rematch'
   players: LobbyPlayer[]
   draft: { currentTurnId: number | null; pickIndex: number; confirmedIds?: number[] }
   champSelect: {
     bans: { userId: number; champions: string[] | null; count: number }[]
     banCount: number
     picks: { userId: number; champion: string }[]
+    trades?: { from: number; to: number }[]
     turn: number[]
   } | null
   match: {
@@ -183,6 +184,10 @@ function onLobbyEvent(bot: Bot, lobby: LobbySnapshot | null) {
     if (!lobby.champSelect.picks.some((p) => p.userId === bot.id)) {
       act('champ', '/lobby/champion', { champion: random(CHAMPIONS.filter((c) => !taken.has(c))) }, ACTION_DELAY_RANGE_MS)
     }
+  } else if (lobby.phase === 'finalize' && lobby.champSelect?.trades?.some((t) => t.to === bot.id)) {
+    // Bot aceita qualquer pedido de troca de campeão.
+    const request = lobby.champSelect.trades.find((t) => t.to === bot.id)!
+    act(`trade${request.from}`, '/lobby/trade/answer', { fromId: request.from, accept: true }, [800, 2000])
   } else if (lobby.phase === 'stats' && lobby.match.statsUploaderId === bot.id) {
     // Bot capitão vencedor: pula o print da pancada.
     act('stats', '/lobby/stats/skip', undefined, ACTION_DELAY_RANGE_MS)

@@ -30,7 +30,7 @@ const stages: { label: string; phases: LobbyPhase[] }[] = [
   { label: 'Capitães', phases: ['voting', 'captains'] },
   { label: 'Sorteio', phases: ['coinflip', 'order', 'side'] },
   { label: 'Draft', phases: ['picking', 'done'] },
-  { label: 'Campeões', phases: ['bans', 'champs'] },
+  { label: 'Campeões', phases: ['bans', 'champs', 'finalize'] },
   { label: 'Partida', phases: ['playing'] },
   { label: 'Resultado', phases: ['result', 'stats', 'mvp', 'bagre'] },
   { label: 'Fim', phases: ['finished', 'rematch'] },
@@ -89,6 +89,9 @@ export default function Lobby() {
     banChampion,
     pickChampion,
     hoverChampion,
+    requestTrade,
+    answerTrade,
+    cancelTrade,
     voteEnd,
     voteResult,
     voteMvp,
@@ -186,8 +189,18 @@ export default function Lobby() {
             {(lobby.phase === 'picking' || lobby.phase === 'done') && (
               <LobbyDraft lobby={lobby} skew={skew} busy={busy} onPick={pick} onConfirm={confirmTeams} />
             )}
-            {(lobby.phase === 'bans' || lobby.phase === 'champs') && lobby.champSelect && (
-            <LobbyChampSelect lobby={lobby} skew={skew} busy={busy} onBan={banChampion} onPick={pickChampion} onHover={hoverChampion} />
+            {(lobby.phase === 'bans' || lobby.phase === 'champs' || lobby.phase === 'finalize') && lobby.champSelect && (
+            <LobbyChampSelect
+              lobby={lobby}
+              skew={skew}
+              busy={busy}
+              onBan={banChampion}
+              onPick={pickChampion}
+              onHover={hoverChampion}
+              onTrade={requestTrade}
+              onTradeAnswer={answerTrade}
+              onTradeCancel={cancelTrade}
+            />
           )}
           {lobby.phase === 'playing' && <LobbyPlaying lobby={lobby} skew={skew} busy={busy} onVoteEnd={voteEnd} />}
             {lobby.phase === 'result' && <LobbyResult lobby={lobby} skew={skew} busy={busy} onVote={voteResult} />}
@@ -204,7 +217,7 @@ export default function Lobby() {
         </section>
 
         {/* Reações rápidas (só no draft): aparecem por cima do ícone de quem mandou e no canto da tela */}
-        {['picking', 'done', 'teams', 'bans', 'champs'].includes(lobby.phase) && (
+        {['picking', 'done', 'teams', 'bans', 'champs', 'finalize'].includes(lobby.phase) && (
           <div className="flex justify-center">
             <ReactionBar onReact={react} />
           </div>

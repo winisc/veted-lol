@@ -15,6 +15,7 @@ export const phaseLabel: Record<LobbyPhase, string> = {
   done: 'Times formados',
   bans: 'Bans',
   champs: 'Escolha de campeões',
+  finalize: 'Finalização (trocas)',
   playing: 'Em partida',
   result: 'Votando o vencedor',
   stats: 'Print da pancada',
