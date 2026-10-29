@@ -337,6 +337,10 @@ function TeamColumn({
   const hoverSlot = captainBans?.champions ? captainBans.champions.length : -1
   // Trocas (durante os picks e na finalização): só no seu time, entre quem já escolheu.
   const me = members.find((m) => m.isYou)
+  // Lista na ordem de escolha (como no LoL): quem troca a vez troca de lugar na lista também.
+  const pickSequence = select.order.flat()
+  const position = (id: number) => (pickSequence.includes(id) ? pickSequence.indexOf(id) : pickSequence.length)
+  const ordered = [...members].sort((a, b) => position(a.id) - position(b.id))
   const trading = ['bans', 'champs', 'finalize'].includes(lobby.phase)
   const trades = select.trades ?? []
   const myRequest = me ? trades.find((t) => t.from === me.id) : undefined
@@ -391,7 +395,7 @@ function TeamColumn({
       </header>
 
       <ul className="space-y-1 p-1.5">
-        {members.map((m) => {
+        {ordered.map((m) => {
           const champion = pickOf(m.id)
           const hovered = !champion && !banning ? (select.hovers ?? []).find((h) => h.userId === m.id)?.champion : undefined
           const choosing = !banning && select.turn.includes(m.id) && !champion
