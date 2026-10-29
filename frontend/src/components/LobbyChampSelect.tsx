@@ -30,13 +30,12 @@ const firstName = (riotId: string) => splitRiotId(riotId)[0]
 
 type ChampSelectState = NonNullable<LobbySnapshot['champSelect']>
 
-// Que troca dá para fazer entre dois colegas: de campeão (os dois já escolheram) ou de vez (nenhum escolheu e
-// não escolhem juntos). Igual à regra do servidor.
+// Que troca dá para fazer entre dois colegas: de campeão (os dois já escolheram) ou de vez (nenhum escolheu ainda).
+// Igual à regra do servidor.
 function tradeKind(select: ChampSelectState, a: number, b: number): 'champion' | 'order' | null {
   const picked = (id: number) => select.picks.some((p) => p.userId === id)
   if (picked(a) && picked(b)) return 'champion'
-  if (picked(a) || picked(b)) return null
-  return select.order.some((slot) => slot.includes(a) && slot.includes(b)) ? null : 'order'
+  return picked(a) || picked(b) ? null : 'order'
 }
 
 // Seleção de campeões (5x5), como a escolha alternada do LoL:
@@ -395,7 +394,7 @@ function TeamColumn({
       </header>
 
       <ul className="space-y-1 p-1.5">
-        {ordered.map((m) => {
+        {ordered.map((m, index) => {
           const champion = pickOf(m.id)
           const hovered = !champion && !banning ? (select.hovers ?? []).find((h) => h.userId === m.id)?.champion : undefined
           const choosing = !banning && select.turn.includes(m.id) && !champion
@@ -404,7 +403,6 @@ function TeamColumn({
           const banningNow = banning && isCaptain && captainCount < select.banCount
           const active = choosing || banningNow
           const kind = trading && me && m.id !== me.id ? tradeKind(select, me.id, m.id) : null
-          const turnNumber = select.order.findIndex((slot) => slot.includes(m.id)) + 1
           return (
             <li
               key={m.id}
@@ -459,7 +457,7 @@ function TeamColumn({
                         ? captainCount >= select.banCount
                           ? 'Bans completos'
                           : `Banindo · ${captainCount}/${select.banCount}`
-                        : `${isCaptain ? 'Capitão · ' : ''}${turnNumber}ª vez`}
+                        : `${isCaptain ? 'Capitão · ' : ''}Pick ${index + 1}`}
                   </span>
                 )}
               </span>

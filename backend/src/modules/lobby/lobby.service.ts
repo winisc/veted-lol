@@ -318,9 +318,8 @@ function requireTrading(userId: number) {
 // Que troca dá para fazer entre os dois agora: de campeão, de ordem ou nenhuma.
 function tradeKind(select: ChampSelect, a: number, b: number): 'champion' | 'order' | null {
   if (select.picks.has(a) && select.picks.has(b)) return 'champion'
-  if (select.picks.has(a) || select.picks.has(b)) return null
-  // Quem escolhe na mesma vez não tem o que trocar.
-  return select.order.some((slot) => slot.includes(a) && slot.includes(b)) ? null : 'order'
+  // Sem campeão nenhum dos dois: troca a ordem (mesmo quem escolhe na mesma vez troca a posição na lista).
+  return select.picks.has(a) || select.picks.has(b) ? null : 'order'
 }
 
 // Tira os pedidos de troca que envolvem o jogador (escolheu campeão ou já trocou: o pedido perdeu o sentido).
