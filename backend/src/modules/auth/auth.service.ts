@@ -1,8 +1,10 @@
 import bcrypt from 'bcryptjs'
 import { AppError } from '../../shared/errors/AppError'
 import { signToken } from '../../shared/utils/jwt'
-import { formatRiotId, parseRiotId } from '../../shared/utils/riotId'
+import { formatRiotId, parseRiotId, type RiotId } from '../../shared/utils/riotId'
 import { bannedError, banService } from '../bans/ban.service'
+import { lobbyRepository } from '../lobby/lobby.repository'
+import { queueRepository } from '../queue/queue.repository'
 import { riotService } from '../riot/riot.service'
 import { userRepository } from '../users/user.repository'
 import type { PublicUser, User } from '../users/user.types'
@@ -75,6 +77,59 @@ export const authService = {
     if (newPassword === currentPassword) throw new AppError('A nova senha precisa ser diferente da atual.', 400)
 
     userRepository.setPassword(userId, await bcrypt.hash(newPassword, 10))
+  },
+
+  // Troca de nick (o jogador mudou o Riot ID no LoL). Pede a senha e confere: formato, se não é de outra conta daqui,
+  // se não está banido e, com a chave da Riot, se a conta existe e é a MESMA conta da Riot (mesmo puuid).
+  async changeRiotId(userId: number, riotId: unknown, password: unknown): Promise<PublicUser> {
+    const user = userRepository.findById(userId)
+    if (!user) throw new AppError('Usuário não encontrado.', 401)
+    if (typeof password !== 'string' || !(await bcrypt.compare(password, user.passwordHash))) {
+      throw new AppError('A senha está incorreta.', 400)
+    }
+    const parsed = parseRiotId(riotId)
+    if (!parsed) throw new AppError('Riot ID inválido. Use o formato Nome#TAG.', 400)
+    // Nome guardado na fila e no lobby: só troca fora deles.
+    if (
+      lobbyRepository.findByUser(userId) ||
+      queueRepository.modeOf(userId) ||
+      queueRepository.standbyModeOf(userId) ||
+      queueRepository.findReadyCheck(userId)
+    ) {
+      throw new AppError('Saia da fila e da partida para trocar o nick.', 409)
+    }
+
+    let account: RiotId = parsed
+    let puuid: string | null = null
+    let iconId: number | null = null
+    if (riotService.isConfigured()) {
+      const profile = await riotService.lookup(parsed)
+      account = { gameName: profile.gameName, tagLine: profile.tagLine }
+      iconId = profile.profileIconId
+      puuid = await riotService.puuidOf(account)
+      if (user.puuid) {
+        if (user.puuid !== puuid) throw new AppError('Esse Riot ID é de outra conta da Riot. Use o novo nick da sua conta.', 400)
+      } else {
+        // Conta antiga sem puuid guardado: se o nick antigo ainda existe na Riot, ele tem que ser a mesma conta.
+        const oldPuuid = await riotService.puuidOf(user).catch((err: unknown) => {
+          if (err instanceof AppError && err.status === 404) return null // nick antigo não existe mais (foi trocado)
+          throw err
+        })
+        if (oldPuuid && oldPuuid !== puuid) throw new AppError('Esse Riot ID é de outra conta da Riot. Use o novo nick da sua conta.', 400)
+        const owner = userRepository.findByPuuid(puuid)
+        if (owner && owner.id !== userId) throw new AppError('Essa conta da Riot já está cadastrada.', 409)
+      }
+    }
+
+    if (account.gameName === user.gameName && account.tagLine === user.tagLine) throw new AppError('Esse já é o seu nick.', 400)
+    if (banService.isRiotIdBanned(account)) throw new AppError('Esse Riot ID está banido.', 403)
+    const other = userRepository.findByRiotId(account)
+    if (other && other.id !== userId) throw new AppError('Esse Riot ID já está cadastrado.', 409)
+
+    userRepository.setRiotId(userId, account)
+    if (puuid) userRepository.setPuuid(userId, puuid)
+    if (iconId !== null) userRepository.updateIcon(userId, iconId)
+    return toPublicUser(userRepository.findById(userId)!)
   },
 
   me(userId: number): PublicUser {

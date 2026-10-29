@@ -103,6 +103,16 @@ export const userRepository = {
     db.prepare('UPDATE users SET sim_elo = ? WHERE id = ?').run(elo ? JSON.stringify(elo) : 'none', userId)
   },
 
+  findByPuuid(puuid: string): User | null {
+    const row = db.prepare('SELECT * FROM users WHERE puuid = ?').get(puuid) as UserRow | undefined
+    return row ? toUser(row) : null
+  },
+
+  // Troca de nick: novo Riot ID (e a conta da Riot confirmada, quando houver).
+  setRiotId(userId: number, { gameName, tagLine }: RiotId) {
+    db.prepare('UPDATE users SET game_name = ?, tag_line = ? WHERE id = ?').run(gameName, tagLine, userId)
+  },
+
   setPuuid(userId: number, puuid: string) {
     db.prepare('UPDATE users SET puuid = ? WHERE id = ?').run(puuid, userId)
   },

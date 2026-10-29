@@ -19,6 +19,7 @@ interface AuthContextValue {
   login: (riotId: string, password: string) => Promise<void>
   register: (riotId: string, password: string) => Promise<void>
   logout: () => void
+  updateUser: (user: User) => void // depois de trocar o nick
   kickedMessage: string // aviso para a tela de entrar (ex.: a conta foi banida com a sessão aberta)
 }
 
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         tokenStorage.clear()
         setUser(null)
       },
+      updateUser: setUser,
       kickedMessage,
     }),
     [user, loading, authenticate, kickedMessage],

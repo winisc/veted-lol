@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAuth, type User } from '../context/AuthContext'
 import { api } from '../lib/api'
+import { cleanRiotIdInput, isValidRiotIdFormat, normalizeRiotId } from '../lib/riotId'
 import { notifyEnabled, notifyState, requestNotifyPermission, setNotifyEnabled, type NotifyState } from '../lib/notify'
 import { getSfxVolume, setSfxVolume, sfx } from '../lib/sfx'
 import { FOUND_SOUND_URL, getQueueVolume, setQueueVolume } from '../lib/sound'
@@ -115,10 +117,60 @@ function PasswordForm({ onSubmit, valid, current, next, confirm, setCurrent, set
   )
 }
 
-// Configurações do jogador, num modal central: som e notificação da fila, e troca de senha.
+interface RiotIdFormProps {
+  onSubmit: () => void
+  valid: boolean
+  currentRiotId: string
+  riotId: string
+  password: string
+  setRiotId: (v: string) => void
+  setPassword: (v: string) => void
+  error: string
+}
+
+// Troca de nick: o novo Riot ID (o mesmo do LoL) e a senha para confirmar.
+function RiotIdForm({ onSubmit, valid, currentRiotId, riotId, password, setRiotId, setPassword, error }: RiotIdFormProps) {
+  const badFormat = riotId.trim().length > 0 && !isValidRiotIdFormat(riotId)
+  return (
+    <form
+      className="space-y-3 text-left"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (valid) onSubmit()
+      }}
+    >
+      <p className="text-sm text-ash">
+        Nick atual: <span className="font-semibold text-gold-50">{currentRiotId}</span>
+      </p>
+      <label className="block text-sm font-medium text-gold-50">
+        Novo Riot ID
+        <input
+          className={inputClass}
+          value={riotId}
+          onChange={(e) => setRiotId(cleanRiotIdInput(e.target.value))}
+          placeholder="Nome#TAG"
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </label>
+      {badFormat && <p className="text-xs text-team-red">Use o formato Nome#TAG (nome de 3 a 16 caracteres, tag de 3 a 5).</p>}
+      <label className="block text-sm font-medium text-gold-50">
+        Senha
+        <input className={inputClass} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+      </label>
+      <p className="text-xs text-ash">
+        Use o Riot ID novo da sua conta do LoL: conferimos na Riot se é a mesma conta. Sua tabela e histórico continuam.
+      </p>
+      {error && <Notice>{error}</Notice>}
+    </form>
+  )
+}
+
+// Configurações do jogador, num modal central: som e notificação da fila, troca de nick e de senha.
 export default function SettingsModal() {
   const [open, setOpen] = useState(false)
-  const [view, setView] = useState<'main' | 'password'>('main')
+  const { user, updateUser } = useAuth()
+  const [view, setView] = useState<'main' | 'password' | 'riotId'>('main')
   const [volume, setVolume] = useState(getQueueVolume)
   const preview = useRef<HTMLAudioElement | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -137,6 +189,14 @@ export default function SettingsModal() {
   const [saving, setSaving] = useState(false)
   const passwordValid = current.length > 0 && next.length >= 6 && next === confirm
 
+  // Troca de nick
+  const [newRiotId, setNewRiotId] = useState('')
+  const [riotIdPassword, setRiotIdPassword] = useState('')
+  const [riotIdError, setRiotIdError] = useState('')
+  const [riotIdDone, setRiotIdDone] = useState(false)
+  const riotIdValid =
+    isValidRiotIdFormat(newRiotId) && riotIdPassword.length > 0 && normalizeRiotId(newRiotId) !== user?.riotId
+
   const stop = useCallback(() => {
     preview.current?.pause()
     preview.current = null
@@ -151,18 +211,23 @@ export default function SettingsModal() {
     setNext('')
     setConfirm('')
     setPasswordError('')
+    setNewRiotId('')
+    setRiotIdPassword('')
+    setRiotIdError('')
   }, [stop])
 
   // Esc e clique fora: na troca de senha só voltam para as configurações.
   const back = useCallback(() => {
     setView('main')
     setPasswordError('')
+    setRiotIdError('')
   }, [])
 
   function openModal() {
     setPermission(notifyState())
     setNotifyOn(notifyEnabled())
     setPasswordDone(false)
+    setRiotIdDone(false)
     setOpen(true)
   }
 
@@ -209,6 +274,26 @@ export default function SettingsModal() {
     }
   }
 
+  async function saveRiotId() {
+    setSaving(true)
+    setRiotIdError('')
+    try {
+      const data = await api<{ user: User }>('/auth/riot-id', {
+        method: 'POST',
+        body: { riotId: normalizeRiotId(newRiotId), password: riotIdPassword },
+      })
+      updateUser(data.user)
+      setNewRiotId('')
+      setRiotIdPassword('')
+      setRiotIdDone(true)
+      setView('main')
+    } catch (err) {
+      setRiotIdError(err instanceof Error ? err.message : 'Erro inesperado.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const percent = Math.round(volume * 100)
   const notifyBlocked = permission === 'denied' || permission === 'unsupported'
 
@@ -224,7 +309,29 @@ export default function SettingsModal() {
         <GearIcon />
       </button>
 
-      {view === 'password' ? (
+      {view === 'riotId' ? (
+        <ConfirmDialog
+          open={open}
+          title="Trocar nick"
+          confirmLabel={saving ? 'Conferindo...' : 'Trocar nick'}
+          cancelLabel="Voltar"
+          busy={saving}
+          confirmDisabled={!riotIdValid}
+          onConfirm={saveRiotId}
+          onCancel={back}
+        >
+          <RiotIdForm
+            onSubmit={saveRiotId}
+            valid={riotIdValid}
+            currentRiotId={user?.riotId ?? ''}
+            riotId={newRiotId}
+            password={riotIdPassword}
+            setRiotId={setNewRiotId}
+            setPassword={setRiotIdPassword}
+            error={riotIdError}
+          />
+        </ConfirmDialog>
+      ) : view === 'password' ? (
         <ConfirmDialog
           open={open}
           title="Trocar senha"
@@ -361,6 +468,20 @@ export default function SettingsModal() {
                   </p>
                 </div>
                 <Switch on={notifyOn && !notifyBlocked} onChange={toggleNotify} label="Notificação do navegador" disabled={notifyBlocked} />
+              </div>
+            </section>
+
+            <section className="border-t border-rim pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gold-50">Nick</p>
+                  <p className="truncate text-xs text-ash">
+                    {riotIdDone ? `Nick alterado para ${user?.riotId}.` : 'Mudou o Riot ID no LoL? Atualize aqui.'}
+                  </p>
+                </div>
+                <HexButton variant="secondary" size="sm" onClick={() => setView('riotId')}>
+                  Trocar nick
+                </HexButton>
               </div>
             </section>
 
