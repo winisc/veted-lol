@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth, type User } from '../context/AuthContext'
 import { api } from '../lib/api'
+import { useRiotLookup, type RiotLookupState } from '../hooks/useRiotLookup'
 import { cleanRiotIdInput, isValidRiotIdFormat, normalizeRiotId } from '../lib/riotId'
+import RiotIdPreview from './RiotIdPreview'
 import { notifyEnabled, notifyState, requestNotifyPermission, setNotifyEnabled, type NotifyState } from '../lib/notify'
 import { getSfxVolume, setSfxVolume, sfx } from '../lib/sfx'
 import { FOUND_SOUND_URL, getQueueVolume, setQueueVolume } from '../lib/sound'
@@ -125,11 +127,12 @@ interface RiotIdFormProps {
   password: string
   setRiotId: (v: string) => void
   setPassword: (v: string) => void
+  lookup: RiotLookupState
   error: string
 }
 
 // Troca de nick: o novo Riot ID (o mesmo do LoL) e a senha para confirmar.
-function RiotIdForm({ onSubmit, valid, currentRiotId, riotId, password, setRiotId, setPassword, error }: RiotIdFormProps) {
+function RiotIdForm({ onSubmit, valid, currentRiotId, riotId, password, setRiotId, setPassword, lookup, error }: RiotIdFormProps) {
   const badFormat = riotId.trim().length > 0 && !isValidRiotIdFormat(riotId)
   return (
     <form
@@ -154,6 +157,8 @@ function RiotIdForm({ onSubmit, valid, currentRiotId, riotId, password, setRiotI
         />
       </label>
       {badFormat && <p className="text-xs text-team-red">Use o formato Nome#TAG (nome de 3 a 16 caracteres, tag de 3 a 5).</p>}
+      {/* Confere na Riot enquanto digita, igual ao cadastro */}
+      <RiotIdPreview lookup={lookup} />
       <label className="block text-sm font-medium text-gold-50">
         Senha
         <input className={inputClass} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
@@ -194,8 +199,13 @@ export default function SettingsModal() {
   const [riotIdPassword, setRiotIdPassword] = useState('')
   const [riotIdError, setRiotIdError] = useState('')
   const [riotIdDone, setRiotIdDone] = useState(false)
+  const riotLookup = useRiotLookup(newRiotId, view === 'riotId')
   const riotIdValid =
-    isValidRiotIdFormat(newRiotId) && riotIdPassword.length > 0 && normalizeRiotId(newRiotId) !== user?.riotId
+    isValidRiotIdFormat(newRiotId) &&
+    riotIdPassword.length > 0 &&
+    normalizeRiotId(newRiotId) !== user?.riotId &&
+    riotLookup.status !== 'loading' &&
+    riotLookup.status !== 'notfound'
 
   const stop = useCallback(() => {
     preview.current?.pause()
@@ -328,6 +338,7 @@ export default function SettingsModal() {
             password={riotIdPassword}
             setRiotId={setNewRiotId}
             setPassword={setRiotIdPassword}
+            lookup={riotLookup}
             error={riotIdError}
           />
         </ConfirmDialog>

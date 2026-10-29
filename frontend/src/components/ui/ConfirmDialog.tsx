@@ -31,6 +31,8 @@ export default function ConfirmDialog({
   actions,
 }: Props) {
   const confirmRef = useRef<HTMLButtonElement>(null)
+  // Só fecha clicando fora se o clique COMEÇOU fora: selecionar texto num campo e soltar fora não fecha.
+  const pressedOutside = useRef(false)
 
   useEffect(() => {
     if (!open) return
@@ -45,12 +47,21 @@ export default function ConfirmDialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4" onClick={onCancel} role="presentation">
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4"
+      onMouseDown={(e) => {
+        pressedOutside.current = e.target === e.currentTarget
+      }}
+      onClick={(e) => {
+        if (pressedOutside.current && e.target === e.currentTarget) onCancel()
+        pressedOutside.current = false
+      }}
+      role="presentation"
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
-        onClick={(e) => e.stopPropagation()}
         className="animate-phase-in relative w-full max-w-sm rounded-xl border border-rim bg-abyss p-6 text-center"
       >
         <h2 id="confirm-dialog-title" className="font-display text-xl text-gold-50">
