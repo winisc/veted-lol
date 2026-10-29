@@ -22,7 +22,7 @@ export function useLobbySounds(lobby: LobbySnapshot | null | undefined, skew: nu
           !(lobby.draft.confirmedIds ?? []).includes(meId)) ||
         (lobby.phase === 'bans' &&
           !!lobby.champSelect?.bans.some((b) => b.userId === meId && b.count < lobby.champSelect!.banCount)) ||
-        (lobby.phase === 'finalize' && !!lobby.champSelect?.trades?.some((t) => t.to === meId)) ||
+        (['bans', 'champs', 'finalize'].includes(lobby.phase) && !!lobby.champSelect?.trades?.some((t) => t.to === meId)) ||
         (lobby.phase === 'champs' &&
           !!lobby.champSelect?.turn.includes(meId) &&
           !lobby.champSelect.picks.some((p) => p.userId === meId)) ||

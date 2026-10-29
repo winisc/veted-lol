@@ -184,7 +184,7 @@ function onLobbyEvent(bot: Bot, lobby: LobbySnapshot | null) {
     if (!lobby.champSelect.picks.some((p) => p.userId === bot.id)) {
       act('champ', '/lobby/champion', { champion: random(CHAMPIONS.filter((c) => !taken.has(c))) }, ACTION_DELAY_RANGE_MS)
     }
-  } else if (lobby.phase === 'finalize' && lobby.champSelect?.trades?.some((t) => t.to === bot.id)) {
+  } else if (['bans', 'champs', 'finalize'].includes(lobby.phase) && lobby.champSelect?.trades?.some((t) => t.to === bot.id)) {
     // Bot aceita qualquer pedido de troca de campeão.
     const request = lobby.champSelect.trades.find((t) => t.to === bot.id)!
     act(`trade${request.from}`, '/lobby/trade/answer', { fromId: request.from, accept: true }, [800, 2000])

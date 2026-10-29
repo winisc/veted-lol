@@ -15,7 +15,7 @@ interface Props {
   onBan: (champion: string) => void
   onPick: (champion: string) => void
   onHover: (champion: string | null) => void // pré-seleção: os outros veem como "selecionando"
-  onTrade: (targetId: number) => void // finalização: pedir troca de campeão com um colega
+  onTrade: (targetId: number) => void // pedir troca (de campeão ou de vez) com um colega
   onTradeAnswer: (fromId: number, accept: boolean) => void
   onTradeCancel: () => void
 }
@@ -28,11 +28,23 @@ const normalize = (text: string) =>
 
 const firstName = (riotId: string) => splitRiotId(riotId)[0]
 
+type ChampSelectState = NonNullable<LobbySnapshot['champSelect']>
+
+// Que troca dá para fazer entre dois colegas: de campeão (os dois já escolheram) ou de vez (nenhum escolheu e
+// não escolhem juntos). Igual à regra do servidor.
+function tradeKind(select: ChampSelectState, a: number, b: number): 'champion' | 'order' | null {
+  const picked = (id: number) => select.picks.some((p) => p.userId === id)
+  if (picked(a) && picked(b)) return 'champion'
+  if (picked(a) || picked(b)) return null
+  return select.order.some((slot) => slot.includes(a) && slot.includes(b)) ? null : 'order'
+}
+
 // Seleção de campeões (5x5), como a escolha alternada do LoL:
 //  1. Bans: só os dois capitães banem, ao mesmo tempo, um campeão por jogador do time. Cada time vê os bans do
 //     próprio capitão; os do adversário aparecem quando os dois terminarem (ou o tempo acabar).
 //  2. Picks: em vezes alternadas (1-2-2-2-2-1), na ordem do draft. Campeão banido ou já escolhido fica bloqueado.
 //  3. Finalização: todos já escolheram; um tempo extra para trocar campeão com um colega (pede e o colega aceita).
+// Como no LoL, colegas também trocam a vez de escolher (antes de escolher) e o campeão (já durante os picks).
 // Ao clicar num campeão ele fica pré-selecionado (os outros veem "selecionando"); só vale depois de confirmar.
 export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onHover, onTrade, onTradeAnswer, onTradeCancel }: Props) {
   const select = lobby.champSelect!
@@ -77,10 +89,10 @@ export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onH
   const nameById = (id: number) => firstName(lobby.players.find((p) => p.id === id)?.riotId ?? '')
 
   // Faixa de status: o que está acontecendo e, em destaque, quando é a sua vez.
-  const headline = finalizing
-    ? incoming
-      ? `${nameById(incoming.from)} quer trocar de campeão com você`
-      : 'Finalização'
+  const headline = incoming && !canAct
+    ? `${nameById(incoming.from)} quer trocar ${tradeKind(select, incoming.from, incoming.to) === 'order' ? 'a vez de escolher' : 'de campeão'} com você`
+    : finalizing
+    ? 'Finalização'
     : canAct
     ? banning
       ? 'Sua vez de banir'
@@ -100,7 +112,9 @@ export default function LobbyChampSelect({ lobby, skew, busy, onBan, onPick, onH
       : select.bans.map((b) => `${nameById(b.userId)} ${b.count}/${select.banCount}`).join(' · ')
     : canAct
       ? 'Clique num campeão para pré-selecionar e confirme.'
-      : 'Campeões banidos ou já escolhidos ficam bloqueados.'
+      : me && pickOf(me.id)
+        ? 'Quer outro campeão? Clique em "Trocar" ao lado de um colega que já escolheu.'
+        : 'Campeões banidos ou já escolhidos ficam bloqueados.'
 
   return (
     <div className="space-y-4">
@@ -321,9 +335,9 @@ function TeamColumn({
   // Ban que o capitão do seu time está pré-selecionando (só o próprio time vê): no próximo espaço vazio.
   const banHover = banning ? (select.hovers ?? []).find((h) => h.userId === captainBans?.userId)?.champion : undefined
   const hoverSlot = captainBans?.champions ? captainBans.champions.length : -1
-  // Finalização: trocas só no seu time.
+  // Trocas (durante os picks e na finalização): só no seu time, entre quem já escolheu.
   const me = members.find((m) => m.isYou)
-  const finalizing = lobby.phase === 'finalize'
+  const trading = ['bans', 'champs', 'finalize'].includes(lobby.phase)
   const trades = select.trades ?? []
   const myRequest = me ? trades.find((t) => t.from === me.id) : undefined
   const tradeButton = 'rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50'
@@ -385,6 +399,8 @@ function TeamColumn({
           const captainCount = select.bans.find((b) => b.userId === m.id)?.count ?? 0
           const banningNow = banning && isCaptain && captainCount < select.banCount
           const active = choosing || banningNow
+          const kind = trading && me && m.id !== me.id ? tradeKind(select, me.id, m.id) : null
+          const turnNumber = select.order.findIndex((slot) => slot.includes(m.id)) + 1
           return (
             <li
               key={m.id}
@@ -439,19 +455,19 @@ function TeamColumn({
                         ? captainCount >= select.banCount
                           ? 'Bans completos'
                           : `Banindo · ${captainCount}/${select.banCount}`
-                        : isCaptain
-                          ? 'Capitão'
-                          : ' '}
+                        : `${isCaptain ? 'Capitão · ' : ''}${turnNumber}ª vez`}
                   </span>
                 )}
               </span>
 
-              {/* Finalização: trocar campeão com um colega (só no seu time) */}
-              {finalizing && me && m.id !== me.id && champion && (
+              {/* Trocar campeão com um colega (só no seu time, os dois já com campeão) */}
+              {me && kind && (
                 <span className="flex shrink-0 flex-col items-end gap-1">
                   {trades.some((t) => t.from === m.id && t.to === me.id) ? (
                     <>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gold-200">Quer trocar</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gold-200">
+                        {kind === 'order' ? 'Quer trocar a vez' : 'Quer trocar'}
+                      </span>
                       <span className="flex gap-1">
                         <button type="button" disabled={busy} onClick={() => onTradeAnswer(m.id, true)} className={`${tradeButton} border-hex-300/60 bg-hex-300/15 text-hex-300 hover:bg-hex-300/25`}>
                           Aceitar
@@ -466,14 +482,20 @@ function TeamColumn({
                       Aguardando · cancelar
                     </button>
                   ) : (
-                    <button type="button" disabled={busy || !pickOf(me.id)} onClick={() => onTrade(m.id)} className={`${tradeButton} border-rim text-gold-50 hover:border-gold-200/60`}>
-                      Trocar
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onTrade(m.id)}
+                      title={kind === 'order' ? 'Trocar a vez de escolher' : 'Trocar de campeão'}
+                      className={`${tradeButton} border-rim text-gold-50 hover:border-gold-200/60`}
+                    >
+                      {kind === 'order' ? 'Trocar vez' : 'Trocar'}
                     </button>
                   )}
                 </span>
               )}
               {/* Pedido entre outros dois colegas: só um aviso */}
-              {finalizing && me && m.id !== me.id && trades.some((t) => t.from === m.id && t.to !== me.id) && (
+              {trading && me && m.id !== me.id && trades.some((t) => t.from === m.id && t.to !== me.id) && (
                 <span className="shrink-0 text-[10px] text-ash">trocando...</span>
               )}
             </li>

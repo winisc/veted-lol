@@ -23,7 +23,7 @@ import { isChampionId, knownChampions, warmChampions } from '../champions/champi
 import { readScoreboard } from '../scoreboard/scoreboard.reader'
 import type { StatsDraft } from '../scoreboard/scoreboard.types'
 import { validateStats } from '../scoreboard/scoreboard.validate'
-import type { Lobby, LobbyEvent, LobbyPhase, LobbyPlayer, LobbySnapshot, MatchOutcome, Side } from './lobby.types'
+import type { ChampSelect, Lobby, LobbyEvent, LobbyPhase, LobbyPlayer, LobbySnapshot, MatchOutcome, Side } from './lobby.types'
 import { boardOf, isAramMode, type QueueMode } from '../../shared/types/modes'
 import { matchRepository } from '../matches/match.repository'
 import { eloService } from '../riot/elo.service'
@@ -281,6 +281,7 @@ function autoChamps(lobby: Lobby) {
     free.splice(free.indexOf(champion), 1)
     select.picks.set(userId, champion)
     select.hovers?.delete(userId)
+    dropTrades(select, userId)
   }
   nextChampTurn(lobby)
 }
@@ -293,10 +294,11 @@ function nextChampTurn(lobby: Lobby) {
 }
 
 // Finalização: todos já escolheram; um tempo extra para trocar campeão com alguém do time, depois a partida começa.
+// Pedidos de troca feitos durante os picks continuam valendo.
 function startFinalize(lobby: Lobby) {
   const select = lobby.champSelect!
   select.hovers = new Map()
-  select.trades = new Map()
+  select.trades ??= new Map()
   setPhase(lobby, 'finalize', lobbyConfig.finalizeMs, () => startPlaying(lobby))
 }
 
@@ -304,11 +306,26 @@ function sameTeam(lobby: Lobby, a: number, b: number) {
   return (lobby.teams.blue.includes(a) && lobby.teams.blue.includes(b)) || (lobby.teams.red.includes(a) && lobby.teams.red.includes(b))
 }
 
-function requireFinalize(userId: number) {
+// Trocas no time, como no LoL: de ordem de escolha (os dois ainda sem campeão, já nos bans) e de campeão
+// (os dois já escolheram, nos picks e na finalização).
+function requireTrading(userId: number) {
   const lobby = requireLobby(userId)
-  if (lobby.phase !== 'finalize' || !lobby.champSelect) throw new AppError('Não é o momento de trocar campeão.', 409)
+  if (!['bans', 'champs', 'finalize'].includes(lobby.phase) || !lobby.champSelect) throw new AppError('Não é o momento de trocar campeão.', 409)
   lobby.champSelect.trades ??= new Map()
   return { lobby, select: lobby.champSelect, trades: lobby.champSelect.trades }
+}
+
+// Que troca dá para fazer entre os dois agora: de campeão, de ordem ou nenhuma.
+function tradeKind(select: ChampSelect, a: number, b: number): 'champion' | 'order' | null {
+  if (select.picks.has(a) && select.picks.has(b)) return 'champion'
+  if (select.picks.has(a) || select.picks.has(b)) return null
+  // Quem escolhe na mesma vez não tem o que trocar.
+  return select.order.some((slot) => slot.includes(a) && slot.includes(b)) ? null : 'order'
+}
+
+// Tira os pedidos de troca que envolvem o jogador (escolheu campeão ou já trocou: o pedido perdeu o sentido).
+function dropTrades(select: ChampSelect, ...ids: number[]) {
+  for (const [from, to] of [...(select.trades ?? [])]) if (ids.includes(from) || ids.includes(to)) select.trades!.delete(from)
 }
 
 // ---- ARAM: times sorteados, equilibrados pela tabela de ARAM ----
@@ -752,29 +769,36 @@ export const lobbyService = {
     return snapshotFor(lobby, userId)
   },
 
-  // Finalização: pede para trocar de campeão com um colega de time (substitui um pedido anterior).
+  // Pede para trocar com um colega de time (substitui um pedido anterior): de campeão se os dois já escolheram,
+  // de ordem de escolha se nenhum escolheu ainda.
   requestTrade(userId: number, targetId: unknown): LobbySnapshot {
-    const { lobby, select, trades } = requireFinalize(userId)
+    const { lobby, select, trades } = requireTrading(userId)
     if (typeof targetId !== 'number' || targetId === userId || !sameTeam(lobby, userId, targetId)) {
       throw new AppError('Só dá para trocar com alguém do seu time.', 400)
     }
-    if (!select.picks.has(userId) || !select.picks.has(targetId)) throw new AppError('Os dois precisam ter campeão para trocar.', 409)
+    if (!tradeKind(select, userId, targetId)) throw new AppError('Não dá para trocar com esse jogador agora.', 409)
     trades.set(userId, targetId)
     broadcast(lobby)
     return snapshotFor(lobby, userId)
   },
 
-  // Resposta a um pedido de troca: aceitar troca os campeões dos dois na hora.
+  // Resposta a um pedido de troca: aceitar troca na hora os campeões (ou as vezes de escolher) dos dois.
   answerTrade(userId: number, fromId: unknown, accept: unknown): LobbySnapshot {
-    const { lobby, select, trades } = requireFinalize(userId)
+    const { lobby, select, trades } = requireTrading(userId)
     if (typeof fromId !== 'number' || trades.get(fromId) !== userId) throw new AppError('Esse pedido de troca não existe mais.', 409)
     trades.delete(fromId)
     if (accept === true) {
-      const mine = select.picks.get(userId)!
-      select.picks.set(userId, select.picks.get(fromId)!)
-      select.picks.set(fromId, mine)
-      // Pedidos que envolviam os dois ficam sem sentido (os campeões mudaram).
-      for (const [from, to] of [...trades]) if ([from, to].some((id) => id === userId || id === fromId)) trades.delete(from)
+      const kind = tradeKind(select, userId, fromId)
+      if (!kind) throw new AppError('Essa troca não dá mais para fazer.', 409)
+      if (kind === 'champion') {
+        const mine = select.picks.get(userId)!
+        select.picks.set(userId, select.picks.get(fromId)!)
+        select.picks.set(fromId, mine)
+      } else {
+        select.order = select.order.map((slot) => slot.map((id) => (id === userId ? fromId : id === fromId ? userId : id)))
+      }
+      // Pedidos que envolviam os dois ficam sem sentido (os campeões ou as vezes mudaram).
+      dropTrades(select, userId, fromId)
     }
     broadcast(lobby)
     return snapshotFor(lobby, userId)
@@ -782,7 +806,7 @@ export const lobbyService = {
 
   // Desiste do próprio pedido de troca.
   cancelTrade(userId: number): LobbySnapshot {
-    const { lobby, trades } = requireFinalize(userId)
+    const { lobby, trades } = requireTrading(userId)
     trades.delete(userId)
     broadcast(lobby)
     return snapshotFor(lobby, userId)
@@ -819,6 +843,7 @@ export const lobbyService = {
 
     select.picks.set(userId, champion)
     select.hovers?.delete(userId)
+    dropTrades(select, userId)
     if (turn.every((id) => select.picks.has(id))) nextChampTurn(lobby)
     else broadcast(lobby)
     return snapshotFor(lobby, userId)
