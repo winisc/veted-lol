@@ -27,34 +27,6 @@ export const lobbyController = {
     res.json({ lobby: lobbyService.chooseSide(req.userId!, req.body?.side) })
   },
 
-  confirm(req: AuthRequest, res: Response) {
-    res.json({ lobby: lobbyService.confirmTeams(req.userId!) })
-  },
-
-  ban(req: AuthRequest, res: Response) {
-    res.json({ lobby: lobbyService.ban(req.userId!, req.body?.champion) })
-  },
-
-  trade(req: AuthRequest, res: Response) {
-    res.json({ lobby: lobbyService.requestTrade(req.userId!, req.body?.targetId) })
-  },
-
-  tradeAnswer(req: AuthRequest, res: Response) {
-    res.json({ lobby: lobbyService.answerTrade(req.userId!, req.body?.fromId, req.body?.accept) })
-  },
-
-  tradeCancel(req: AuthRequest, res: Response) {
-    res.json({ lobby: lobbyService.cancelTrade(req.userId!) })
-  },
-
-  hover(req: AuthRequest, res: Response) {
-    res.json({ lobby: lobbyService.hoverChampion(req.userId!, req.body?.champion ?? null) })
-  },
-
-  champion(req: AuthRequest, res: Response) {
-    res.json({ lobby: lobbyService.pickChampion(req.userId!, req.body?.champion) })
-  },
-
   pick(req: AuthRequest, res: Response) {
     res.json({ lobby: lobbyService.pick(req.userId!, req.body?.playerId) })
   },

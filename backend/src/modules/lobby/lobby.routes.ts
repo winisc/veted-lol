@@ -14,13 +14,6 @@ lobbyRoutes.post('/order', lobbyController.order)
 lobbyRoutes.post('/react', lobbyController.react)
 lobbyRoutes.post('/side', lobbyController.side)
 lobbyRoutes.post('/pick', lobbyController.pick)
-lobbyRoutes.post('/confirm', lobbyController.confirm) // capitães confirmam os times formados
-lobbyRoutes.post('/ban', lobbyController.ban) // seleção de campeões
-lobbyRoutes.post('/champion', lobbyController.champion)
-lobbyRoutes.post('/hover', lobbyController.hover) // pré-seleção de campeão (ainda não confirmada)
-lobbyRoutes.post('/trade', lobbyController.trade) // finalização: pedir troca de campeão com um colega
-lobbyRoutes.post('/trade/answer', lobbyController.tradeAnswer)
-lobbyRoutes.post('/trade/cancel', lobbyController.tradeCancel)
 lobbyRoutes.post('/end', lobbyController.end)
 lobbyRoutes.post('/result', lobbyController.result)
 // Print do placar: a imagem vai crua no corpo (PNG, JPG ou WebP, até 10 MB).

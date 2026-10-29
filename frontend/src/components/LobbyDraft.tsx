@@ -1,7 +1,6 @@
 import type { LobbySnapshot, Side } from '../hooks/useLobby'
 import { short, sideStyle, teamMembers } from '../lib/teams'
 import PhaseTimer from './PhaseTimer'
-import HexButton from './ui/HexButton'
 import TeamCard from './TeamCard'
 import { YouBadge } from './ui/Badges'
 import { ReactionBubble } from './Reactions'
@@ -18,13 +17,12 @@ interface Props {
   skew: number
   busy: boolean
   onPick: (playerId: number) => void
-  onConfirm: () => void // capitão confirma os times formados (vai para os bans)
 }
 
 const TEAM_SIZE = 5
 
 // Tela no formato da seleção de campeões: Time Azul | jogadores disponíveis | Time Vermelho.
-export default function LobbyDraft({ lobby, skew, busy, onPick, onConfirm }: Props) {
+export default function LobbyDraft({ lobby, skew, busy, onPick }: Props) {
   const { draft } = lobby
   const me = lobby.players.find((p) => p.isYou)
   const byId = (id: number | null) => lobby.players.find((p) => p.id === id)
@@ -36,10 +34,6 @@ export default function LobbyDraft({ lobby, skew, busy, onPick, onConfirm }: Pro
   const turnSide: Side | null = turnPlayer?.team ?? null
   const pool = lobby.players.filter((p) => p.team === null)
   const picksWord = draft.turnPicksLeft === 1 ? 'jogador' : 'jogadores'
-  // Times formados: os dois capitães confirmam para ir aos bans.
-  const confirmed = draft.confirmedIds ?? []
-  const captains = lobby.captains.map((id) => byId(id)).filter((p): p is NonNullable<typeof p> => Boolean(p))
-  const iConfirmed = me ? confirmed.includes(me.id) : false
 
   return (
     <div className="space-y-4">
@@ -56,23 +50,9 @@ export default function LobbyDraft({ lobby, skew, busy, onPick, onConfirm }: Pro
           aria-live="polite"
         >
           {lobby.phase === 'done' ? (
-            <div className="flex w-full flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-display text-xl text-gold-50">Times formados</p>
-                <p className="text-sm text-ash">
-                  {captains.map((c, i) => (
-                    <span key={c.id}>
-                      {i > 0 && ' · '}
-                      {short(c)} {confirmed.includes(c.id) ? <span className="text-hex-300">✓ confirmou</span> : 'aguardando'}
-                    </span>
-                  ))}
-                </p>
-              </div>
-              {me?.isCaptain && (
-                <HexButton onClick={onConfirm} disabled={busy || iConfirmed} size="sm">
-                  {iConfirmed ? 'Confirmado' : 'Confirmar times'}
-                </HexButton>
-              )}
+            <div>
+              <p className="font-display text-xl text-gold-50">Times formados</p>
+              <p className="text-sm text-ash">A partida começa em instantes. Boa sorte, invocadores.</p>
             </div>
           ) : (
             <>
@@ -102,7 +82,7 @@ export default function LobbyDraft({ lobby, skew, busy, onPick, onConfirm }: Pro
           endsAt={lobby.endsAt}
           durationMs={lobby.durationMs}
           skew={skew}
-          label={picking ? 'Sem escolha, um jogador aleatório é sorteado' : 'Capitães confirmam para ir aos bans (sem confirmação, segue sozinho)'}
+          label={picking ? 'Sem escolha, um jogador aleatório é sorteado' : undefined}
         />
       </div>
 

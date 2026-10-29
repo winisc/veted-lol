@@ -1,5 +1,5 @@
 import type { LobbyPlayer, PlayerGameStats, Side } from '../hooks/useLobby'
-import ChampionKda, { ChampionIcon } from './ui/ChampionKda'
+import ChampionKda from './ui/ChampionKda'
 import { sideStyle } from '../lib/teams'
 import { BagreBadge, CaptainBadge, MvpBadge, YouBadge } from './ui/Badges'
 import { useProfilePath } from './ui/PlayerLink'
@@ -12,7 +12,7 @@ import RoleIcons from './ui/RoleIcons'
 
 interface Props {
   side: Side
-  members: (LobbyPlayer & { champion?: string })[] // `champion`: escolhido na seleção de campeões
+  members: LobbyPlayer[]
   slots?: number // mostra vagas vazias até esse total ("Aguardando pick...")
   mvpId?: number | null
   bagreId?: number | null
@@ -54,7 +54,6 @@ export default function TeamCard({ side, members, slots, mvpId, bagreId, winner,
                 right={(() => {
                   const mine = stats?.find((s) => s.userId === member.id)
                   if (mine) return <ChampionKda stats={mine} />
-                  if (member.champion) return <ChampionIcon champion={member.champion} />
                   return hideRoles ? undefined : <RoleIcons roles={member.roles} />
                 })()}
                 badges={

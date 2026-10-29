@@ -18,9 +18,6 @@ export type LobbyPhase =
   | 'side'
   | 'picking'
   | 'done'
-  | 'bans' // seleção de campeões (5x5): os dois capitães banem ao mesmo tempo (5 cada); os do adversário aparecem no fim
-  | 'champs' // seleção de campeões: picks alternados entre os times (1-2-2-2-2-1), na ordem do draft
-  | 'finalize' // finalização: tempo extra depois dos picks para trocar campeão com alguém do time
   | 'playing'
   | 'result'
   | 'stats' // capitão vencedor envia o print do placar e confere os números (5x5; pode pular)
@@ -77,36 +74,11 @@ export interface Lobby {
   bagreVotes: Map<number, number> // quem votou -> em quem votou
   bagreId: number | null
   gameStats?: PlayerGameStats[] | null // números de cada jogador, do print do placar (null = pulado)
-  champSelect?: ChampSelect | null // seleção de campeões (5x5), depois do draft
-  draftConfirms?: Set<number> // capitães que confirmaram os times (fase "done") para ir aos bans
   matchId: string // id da partida no histórico; muda a cada revanche
   gameNumber: number // 1 = primeira partida do lobby; sobe a cada "jogar novamente"
   rematchVotes: Set<number> // quem votou para jogar novamente
   left: Set<number> // quem saiu do lobby depois de a partida terminar
   createdAt: number
-}
-
-// Seleção de campeões: os capitães banem (ao mesmo tempo), depois picks em vezes (grupos de 1 ou 2 jogadores).
-export interface ChampSelect {
-  bans: Map<number, string[]> // capitão -> campeões que ele baniu pelo time
-  banCount: number // bans de cada capitão (um por jogador do time)
-  order: number[][] // vezes dos picks: [[azul 1], [verm. 1, verm. 2], [azul 2, azul 3], ...]
-  turn: number // índice da vez atual em `order`
-  picks: Map<number, string> // jogador -> campeão escolhido
-  hovers?: Map<number, string> // pré-seleção (ainda não confirmada): jogador -> campeão
-  trades?: Map<number, number> // finalização: pedidos de troca de campeão (quem pediu -> com quem)
-}
-
-export interface ChampSelectSnapshot {
-  // Bans de cada capitão. Durante os bans, os do capitão adversário vêm escondidos (`champions: null`, só a contagem).
-  bans: { userId: number; champions: string[] | null; count: number }[]
-  banCount: number
-  // Pré-seleções ainda não confirmadas. Nos bans, só as do próprio capitão (para não entregar o ban).
-  hovers: { userId: number; champion: string }[]
-  picks: { userId: number; champion: string }[]
-  trades: { from: number; to: number }[] // pedidos de troca do seu time (finalização)
-  turn: number[] // quem escolhe agora
-  order: number[][]
 }
 
 export interface DraftSnapshot {
@@ -119,7 +91,6 @@ export interface DraftSnapshot {
   pickIndex: number
   totalPicks: number
   picks: Pick[]
-  confirmedIds: number[] // capitães que já confirmaram os times (fase "done")
 }
 
 export interface MatchSnapshot {
@@ -176,7 +147,6 @@ export interface LobbySnapshot {
   votedCount: number
   captains: number[]
   draft: DraftSnapshot
-  champSelect: ChampSelectSnapshot | null
   match: MatchSnapshot
 }
 
